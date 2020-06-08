@@ -11,18 +11,16 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver import DesiredCapabilities
 from selenium.webdriver.chrome.options import Options
 
-from facebook.general_utils import FacebookParseError
-from facebook.page_utils import get_design_full_login_elements, get_design_min_login_elements, get_display_name, \
-    get_club_id, get_club_icon, get_members_and_page_like_count, get_post_parent_selector, scroll_while_post_loaded, \
-    extract_posts
-from facebook.post_utils import get_post_short_text, generate_post_id, get_likes_count, get_actions_count, \
-    get_post_img, get_post_date
+from selenium_parsers.facebook.utils.general import FacebookParseError
+from selenium_parsers.facebook.utils.login import login
+from selenium_parsers.facebook.utils.page import get_display_name, get_club_id, get_club_icon, \
+    get_members_and_page_like_count, get_post_parent_selector, scroll_while_post_loaded, extract_posts
+from selenium_parsers.facebook.utils.post import get_post_short_text, generate_post_id, get_likes_count, \
+    get_actions_count, get_post_img, get_post_date
+
 
 file_dir = os.path.dirname(__file__)
 sys.path.append(file_dir)
-
-from selenium_parsers.utils.selenium_utils import write_text  # noqa: E402
-
 
 logger = logging.getLogger(__name__)
 
@@ -63,30 +61,8 @@ def setup_driver():
     return driver
 
 
-def input_login_data(driver, email_field, password_field, submit_btn):
-    write_text(driver, email_field, 'ivan.kohomov@gmail.com')
-    write_text(driver, password_field, '5!kX4/PxA96W')
-    submit_btn.click()
-
-
-def login(driver):
-    facebook_design_schemes = [get_design_full_login_elements, get_design_min_login_elements]
-    for scheme in facebook_design_schemes:
-        try:
-            email_field, password_field, submit_btn = scheme(driver)
-            input_login_data(driver, email_field, password_field, submit_btn)
-        except NoSuchElementException:
-            logger.warning(f'design scheme {scheme} not suitable')
-        else:
-            logger.info(f'use {scheme} design scheme for login')
-            return
-
-    logger.critical('Facebook login page was modified, login scrips no longer work')
-
-
 def parse_post(post, club_id):
     post_short_text = get_post_short_text(post)
-    print('post_short_text', post_short_text)
     try:
         post_id = generate_post_id(post_short_text)
 
@@ -118,7 +94,10 @@ def main(driver, database):
     facebook_posts_data = database['facebook_posts_data']
 
     driver.get('https://facebook.com')
-    login(driver)
+    user_email = os.environ.get('FB_USERNAME')
+    user_passwd = os.environ.get('FB_PASSWD')
+
+    login(driver, user_email, user_passwd)
     sleep(3)
     links = [
         'https://www.facebook.com/SIRELIS.BEAUTY.SILK',
@@ -130,7 +109,7 @@ def main(driver, database):
             driver.get(f'{link}/posts/')
             sleep(3)
 
-            display_name = get_display_name(driver)
+            display_name = get_display_name(driver) or link.split('/')[-1]
             club_id = get_club_id(driver)
             club_icon = get_club_icon(driver, club_id)
 

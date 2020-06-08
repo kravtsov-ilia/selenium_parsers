@@ -23,5 +23,4 @@ RUN \
  pip install -r requirements.txt --no-cache-dir && \
  apk --purge del .build-deps
 
-#CMD ["python", "/opt/selenium_parsers/facebook/groups_parser.py"]
-CMD ["tail", "-f"]
+CMD ["python", "/opt/selenium_parsers/facebook/groups_parser.py"]

@@ -1,9 +1,10 @@
 import logging
 from time import sleep
 
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.keys import Keys
 
-from facebook.general_utils import FacebookParseError, download_fb_image
+from selenium_parsers.facebook.utils.general import FacebookParseError, download_fb_image
 
 logger = logging.getLogger(__name__)
 
@@ -33,20 +34,6 @@ def get_members_and_page_like_count(driver, redirect_location) -> tuple:
     driver.get(redirect_location)
     sleep(3)
     return tuple(result)
-
-
-def get_design_full_login_elements(driver):
-    email_field = driver.find_element_by_xpath('//input[@data-testid="royal_email"]')
-    password_field = driver.find_element_by_xpath('//input[@data-testid="royal_pass"]')
-    submit_btn = driver.find_element_by_xpath('//input[@data-testid="royal_login_button"]')
-    return email_field, password_field, submit_btn
-
-
-def get_design_min_login_elements(driver):
-    email_field = driver.find_element_by_xpath('//input[@id="email"]')
-    password_field = driver.find_element_by_xpath('//input[@id="pass"]')
-    submit_btn = driver.find_element_by_xpath('//input[@type="submit"]')
-    return email_field, password_field, submit_btn
 
 
 def get_post_parent_selector(driver):
@@ -117,7 +104,20 @@ def extract_posts(driver, posts_selector):
 
 
 def get_display_name(driver):
-    return driver.find_element_by_xpath('//h1[@id="seo_h1_tag"]/a/span').text
+    display_name_selectors = (
+        '//h1[@id="seo_h1_tag"]/a/span',
+        '//h1[@id="seo_h1_tag"]',
+    )
+
+    for selector in display_name_selectors:
+        try:
+            display_name = driver.find_element_by_xpath(selector).text
+        except NoSuchElementException:
+            pass
+        else:
+            return display_name
+
+    logger.error('can not parse group display name')
 
 
 def get_club_id(driver):

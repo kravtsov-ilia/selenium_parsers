@@ -3,18 +3,27 @@ import logging
 import dateparser
 from selenium.common.exceptions import NoSuchElementException
 
-from facebook.general_utils import FacebookParseError, download_fb_image
+from selenium_parsers.facebook.utils.general import download_fb_image, FacebookParseError
 
 logger = logging.getLogger(__name__)
 
 
-def get_post_short_text(post_el):
+def get_post_short_text(post_el) -> str:
     post_el_text = post_el.text
     post_el_text_lines = post_el_text.split('\n')
     post_message_text = post_el_text_lines[2:]
-    short_text = ''.join(
-        [line for line in post_message_text if line not in ('Нравится', 'Комментировать', 'Поделиться')]
-    )
+    stop_words = ('Комментарии:', 'Поделились:', 'Нравится', 'Комментировать', 'Поделиться')
+    lines = []
+    try:
+        for line in post_message_text:
+            for stop_word in stop_words:
+                if stop_word in line:
+                    raise StopIteration
+            lines.append(line)
+    except StopIteration:
+        pass
+
+    short_text = ''.join(lines)
     return short_text
 
 
