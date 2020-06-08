@@ -4,20 +4,19 @@ from time import sleep
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.keys import Keys
 
-from selenium_parsers.facebook.utils.general import FacebookParseError, download_fb_image
+from selenium_parsers.facebook.utils.general import FacebookParseError
 
 logger = logging.getLogger(__name__)
 
 
-def get_club_icon(driver, club_id):
+def get_club_icon(driver, club_id: str) -> str:
     try:
         fb_icon_block = driver.find_elements_by_xpath('//div[@id="entity_sidebar"]')[0]
         fb_icon_link = fb_icon_block.find_elements_by_xpath('.//img')[0].get_attribute('src')
     except IndexError:
         logger.error(f'can not parse club icon for {club_id}', exc_info=True)
         return ''
-    print(fb_icon_link, 'fb_icon_link')
-    return download_fb_image(fb_icon_link, club_id)
+    return fb_icon_link
 
 
 def get_members_and_page_like_count(driver, redirect_location) -> tuple:
@@ -89,7 +88,6 @@ def scroll_while_post_loaded(driver, posts_selector):
         sleep(2)
         prev_posts_count = current_posts_count
         current_posts_count = len(driver.find_elements_by_css_selector(posts_selector))
-        print('current_posts_count', current_posts_count)
 
 
 def extract_posts(driver, posts_selector):

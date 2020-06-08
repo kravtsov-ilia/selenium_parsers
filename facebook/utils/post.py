@@ -1,9 +1,10 @@
 import logging
+from typing import Optional
 
 import dateparser
 from selenium.common.exceptions import NoSuchElementException
 
-from selenium_parsers.facebook.utils.general import download_fb_image, FacebookParseError
+from selenium_parsers.facebook.utils.general import FacebookParseError
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def get_post_date(post):
     return dateparser.parse(post_date_str, date_formats=['%A, %d %B %Y г. в %H:%M'], languages=['ru'])
 
 
-def get_post_img(post, post_id):
+def get_post_img(post) -> Optional[str]:
     try:
         fb_link = (
             post
@@ -49,8 +50,7 @@ def get_post_img(post, post_id):
     except (IndexError, NoSuchElementException):
         return None
     else:
-        local_link = download_fb_image(fb_link, post_id)
-        return local_link
+        return fb_link
 
 
 def get_actions_count(post_el, post_name, sub_string):

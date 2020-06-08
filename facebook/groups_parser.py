@@ -53,11 +53,11 @@ def setup_driver():
 
         driver = webdriver.Chrome(
             chrome_driver_binary,
-            chrome_options=chrome_options,
+            options=chrome_options,
             desired_capabilities=capabilities
         )
 
-    driver.implicitly_wait(3)
+    driver.implicitly_wait(5)
     return driver
 
 
@@ -70,13 +70,13 @@ def parse_post(post, club_id):
         comments_cnt = get_actions_count(post, post_short_text, 'Комментарии') or 0
         shares_cnt = get_actions_count(post, post_short_text, 'Поделились') or 0
 
-        local_image_link = get_post_img(post, post_id)
+        image_link = get_post_img(post)
         post_date = get_post_date(post)
         post_data = {
             'club_id': club_id,
             'post_id': post_id,
             'datetime': post_date,
-            'post_img': local_image_link,
+            'post_img': image_link,
             'short_text': post_short_text,
             'comments': comments_cnt,
             'shares': shares_cnt,
@@ -105,10 +105,10 @@ def main(driver, database):
         'https://www.facebook.com/auchanrussia',
     ]
     for link in links[0:]:
+        logger.info(f'starting to parse {link}')
+        driver.get(f'{link}/posts/')
+        sleep(3)
         try:
-            driver.get(f'{link}/posts/')
-            sleep(3)
-
             display_name = get_display_name(driver) or link.split('/')[-1]
             club_id = get_club_id(driver)
             club_icon = get_club_icon(driver, club_id)
