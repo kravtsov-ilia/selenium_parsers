@@ -1,6 +1,5 @@
 #!/usr/bin python
 import datetime
-import logging
 import os
 import sys
 from time import sleep
@@ -13,6 +12,7 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver import DesiredCapabilities
 from selenium.webdriver.chrome.options import Options
 
+from selenium_parsers.facebook import logger
 from selenium_parsers.facebook.utils.general import FacebookParseError
 from selenium_parsers.facebook.utils.login import login
 from selenium_parsers.facebook.utils.page import get_display_name, get_club_id, get_club_icon, \
@@ -26,14 +26,7 @@ if TYPE_CHECKING:
     from selenium.webdriver.remote.webelement import WebElement
 
 
-file_dir = os.path.dirname(__file__)
-sys.path.append(file_dir)
-
-logger = logging.getLogger(__name__)
-logger.setLevel('INFO')
-
-
-def get_tuned_driver() -> None:
+def get_tuned_driver() -> 'WebDriver':
     os.environ["DISPLAY"] = ':99'
 
     chrome_options = Options()
@@ -46,7 +39,7 @@ def get_tuned_driver() -> None:
     if sys.platform == 'darwin':
         chrome_options.add_argument("--window-size=1220x1080")
         driver = webdriver.Chrome(
-            chrome_options=chrome_options,
+            options=chrome_options,
             desired_capabilities=capabilities
         )
     else:
@@ -69,7 +62,7 @@ def get_tuned_driver() -> None:
     return driver
 
 
-def parse_post(post: WebElement, club_id: int):
+def parse_post(post: 'WebElement', club_id: str):
     post_short_text = get_post_short_text(post)
     try:
         post_id = generate_post_id(post_short_text)
@@ -97,7 +90,7 @@ def parse_post(post: WebElement, club_id: int):
         raise
 
 
-def main(driver: WebDriver, facebook_pages: List[str], database: Database) -> None:
+def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -> None:
     facebook_pages_data = database['facebook_pages_data']
     facebook_posts_data = database['facebook_posts_data']
 
@@ -161,7 +154,7 @@ def main(driver: WebDriver, facebook_pages: List[str], database: Database) -> No
             logger.error(f'cant parse facebook page {link}', exc_info=True)
 
 
-def get_facebook_links() -> list:
+def get_facebook_links() -> List[str]:
     connection = psycopg2.connect(
         dbname=os.getenv('POSTGRES_NAME'),
         user=os.getenv('POSTGRES_USER'),

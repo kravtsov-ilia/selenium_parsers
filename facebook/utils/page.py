@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from selenium.webdriver.chrome.webdriver import WebDriver
     from selenium.webdriver.remote.webelement import WebElement  # noqa: F401
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('selenium_parser')
 
 
 def get_club_icon(driver: 'WebDriver', club_id: str) -> str:

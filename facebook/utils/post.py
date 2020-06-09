@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     import datetime
     from selenium.webdriver.remote.webelement import WebElement
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('selenium_parser')
 
 
 def get_post_short_text(post_el: 'WebElement') -> str:
