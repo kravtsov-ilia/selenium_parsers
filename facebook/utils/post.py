@@ -1,15 +1,19 @@
 import logging
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import dateparser
 from selenium.common.exceptions import NoSuchElementException
 
 from selenium_parsers.facebook.utils.general import FacebookParseError
 
+if TYPE_CHECKING:
+    import datetime
+    from selenium.webdriver.remote.webelement import WebElement
+
 logger = logging.getLogger(__name__)
 
 
-def get_post_short_text(post_el) -> str:
+def get_post_short_text(post_el: 'WebElement') -> str:
     post_el_text = post_el.text
     post_el_text_lines = post_el_text.split('\n')
     post_message_text = post_el_text_lines[2:]
@@ -32,14 +36,14 @@ def generate_post_id(post_short_text: str) -> int:
     return abs(hash(f'{post_short_text}')) % (10 ** 8)
 
 
-def get_post_date(post):
+def get_post_date(post: 'WebElement') -> 'datetime.datetime':
     post_date_str = post.find_element_by_xpath('.//a/abbr[@data-utime]').get_attribute('title')
     import locale
     locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
     return dateparser.parse(post_date_str, date_formats=['%A, %d %B %Y г. в %H:%M'], languages=['ru'])
 
 
-def get_post_img(post) -> Optional[str]:
+def get_post_img(post: 'WebElement') -> Optional[str]:
     try:
         fb_link = (
             post
@@ -53,7 +57,7 @@ def get_post_img(post) -> Optional[str]:
         return fb_link
 
 
-def get_actions_count(post_el, post_name, sub_string):
+def get_actions_count(post_el: 'WebElement', post_name: str, sub_string: str) -> int:
     comments_block = post_el.find_elements_by_xpath(f'.//*[contains(text(), "{sub_string}:")]')
     if len(comments_block) > 1:
         raise FacebookParseError(f'can not parse post {post_name}, too mach blocks - {sub_string}')
@@ -62,11 +66,11 @@ def get_actions_count(post_el, post_name, sub_string):
         return int(count_part)
 
 
-def get_likes_count(post_el):
+def get_likes_count(post_el: 'WebElement') -> int:
     try:
         likes_icons_block = post_el.find_element_by_xpath('.//*[@aria-label="Посмотрите, кто отреагировал на это"]')
     except NoSuchElementException:
-        return None
+        return 0
 
     likes_block = likes_icons_block.find_element_by_xpath('..')
     spans = likes_block.find_elements_by_xpath('.//span')

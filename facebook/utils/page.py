@@ -1,15 +1,20 @@
 import logging
 from time import sleep
+from typing import TYPE_CHECKING, List, Optional
 
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.keys import Keys
 
 from selenium_parsers.facebook.utils.general import FacebookParseError
 
+if TYPE_CHECKING:
+    from selenium.webdriver.chrome.webdriver import WebDriver
+    from selenium.webdriver.remote.webelement import WebElement  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 
-def get_club_icon(driver, club_id: str) -> str:
+def get_club_icon(driver: 'WebDriver', club_id: str) -> str:
     try:
         fb_icon_block = driver.find_elements_by_xpath('//div[@id="entity_sidebar"]')[0]
         fb_icon_link = fb_icon_block.find_elements_by_xpath('.//img')[0].get_attribute('src')
@@ -19,7 +24,7 @@ def get_club_icon(driver, club_id: str) -> str:
     return fb_icon_link
 
 
-def get_members_and_page_like_count(driver, redirect_location) -> tuple:
+def get_members_and_page_like_count(driver: 'WebDriver', redirect_location: str) -> tuple:
     driver.find_element_by_xpath('//div/a[@data-endpoint]/span[contains(text(), "Сообщество")]').click()
     sleep(3)
     members_child_el = driver.find_element_by_xpath('//div[contains(text(), "Всего подписчиков")]')
@@ -35,7 +40,7 @@ def get_members_and_page_like_count(driver, redirect_location) -> tuple:
     return tuple(result)
 
 
-def get_post_parent_selector(driver):
+def get_post_parent_selector(driver: 'WebDriver') -> str:
     likes_blocks = driver.find_elements_by_xpath(f'//*[contains(text(), "Нравится")]')
     comments_blocks = driver.find_elements_by_xpath(f'//*[contains(text(), "Комментировать")]')
     shares_blocks = driver.find_elements_by_xpath(f'//*[contains(text(), "Поделиться")]')
@@ -69,7 +74,7 @@ def get_post_parent_selector(driver):
     raise FacebookParseError('cant not find main post ancestor')
 
 
-def scroll_while_post_loaded(driver, posts_selector):
+def scroll_while_post_loaded(driver: 'WebDriver', posts_selector: str) -> None:
     prev_posts_count = len(driver.find_elements_by_css_selector(posts_selector))
 
     current_posts_count = 0
@@ -90,7 +95,7 @@ def scroll_while_post_loaded(driver, posts_selector):
         current_posts_count = len(driver.find_elements_by_css_selector(posts_selector))
 
 
-def extract_posts(driver, posts_selector):
+def extract_posts(driver: 'WebDriver', posts_selector: str) -> List['WebElement']:
     elements = driver.find_elements_by_css_selector(posts_selector)
     posts = []
     for element in elements:
@@ -101,7 +106,7 @@ def extract_posts(driver, posts_selector):
     return posts
 
 
-def get_display_name(driver):
+def get_display_name(driver: 'WebDriver') -> Optional[str]:
     display_name_selectors = (
         '//h1[@id="seo_h1_tag"]/a/span',
         '//h1[@id="seo_h1_tag"]',
@@ -118,5 +123,5 @@ def get_display_name(driver):
     logger.error('can not parse group display name')
 
 
-def get_club_id(driver):
+def get_club_id(driver: 'WebDriver') -> str:
     return driver.find_element_by_xpath('//div/a[@href="#"][contains(text(), "@")]').text

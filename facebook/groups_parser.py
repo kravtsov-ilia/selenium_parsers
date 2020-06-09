@@ -4,7 +4,9 @@ import logging
 import os
 import sys
 from time import sleep
+from typing import List, TYPE_CHECKING
 
+import psycopg2
 import pymongo
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
@@ -18,14 +20,20 @@ from selenium_parsers.facebook.utils.page import get_display_name, get_club_id, 
 from selenium_parsers.facebook.utils.post import get_post_short_text, generate_post_id, get_likes_count, \
     get_actions_count, get_post_img, get_post_date
 
+if TYPE_CHECKING:
+    from pymongo.database import Database
+    from selenium.webdriver.chrome.webdriver import WebDriver
+    from selenium.webdriver.remote.webelement import WebElement
+
 
 file_dir = os.path.dirname(__file__)
 sys.path.append(file_dir)
 
 logger = logging.getLogger(__name__)
+logger.setLevel('INFO')
 
 
-def setup_driver():
+def get_tuned_driver() -> None:
     os.environ["DISPLAY"] = ':99'
 
     chrome_options = Options()
@@ -61,14 +69,14 @@ def setup_driver():
     return driver
 
 
-def parse_post(post, club_id):
+def parse_post(post: WebElement, club_id: int):
     post_short_text = get_post_short_text(post)
     try:
         post_id = generate_post_id(post_short_text)
 
-        likes_count = get_likes_count(post) or 0
-        comments_cnt = get_actions_count(post, post_short_text, 'Комментарии') or 0
-        shares_cnt = get_actions_count(post, post_short_text, 'Поделились') or 0
+        likes_count = get_likes_count(post)
+        comments_cnt = get_actions_count(post, post_short_text, 'Комментарии')
+        shares_cnt = get_actions_count(post, post_short_text, 'Поделились')
 
         image_link = get_post_img(post)
         post_date = get_post_date(post)
@@ -89,7 +97,7 @@ def parse_post(post, club_id):
         raise
 
 
-def main(driver, database):
+def main(driver: WebDriver, facebook_pages: List[str], database: Database) -> None:
     facebook_pages_data = database['facebook_pages_data']
     facebook_posts_data = database['facebook_posts_data']
 
@@ -99,12 +107,7 @@ def main(driver, database):
 
     login(driver, user_email, user_passwd)
     sleep(3)
-    links = [
-        'https://www.facebook.com/SIRELIS.BEAUTY.SILK',
-        'https://www.facebook.com/JustinBieberofficialFC',
-        'https://www.facebook.com/auchanrussia',
-    ]
-    for link in links[0:]:
+    for link in facebook_pages:
         logger.info(f'starting to parse {link}')
         driver.get(f'{link}/posts/')
         sleep(3)
@@ -119,10 +122,10 @@ def main(driver, database):
             scroll_while_post_loaded(driver, posts_selector)
             posts = extract_posts(driver, posts_selector)
 
-            total_posts_counter = 0
-            total_likes_counter = 0
-            total_comments_counter = 0
-            total_shares_counter = 0
+            total_posts_counter: int = 0
+            total_likes_counter: int = 0
+            total_comments_counter: int = 0
+            total_shares_counter: int = 0
             for i, post in enumerate(posts, start=1):
                 try:
                     post_data = parse_post(post, club_id)
@@ -158,12 +161,31 @@ def main(driver, database):
             logger.error(f'cant parse facebook page {link}', exc_info=True)
 
 
+def get_facebook_links() -> list:
+    connection = psycopg2.connect(
+        dbname=os.getenv('POSTGRES_NAME'),
+        user=os.getenv('POSTGRES_USER'),
+        password=os.getenv('POSTGRES_PASS'),
+        host='postgres'
+    )
+    fb_links = []
+    try:
+        cursor = connection.cursor()
+        cursor.execute("SELECT page_link FROM api_facebookpage")
+        for fb_record in cursor.fetchall():
+            fb_links.append(fb_record[0])
+    finally:
+        connection.close()
+    return fb_links
+
+
 if __name__ == '__main__':
-    chrom_driver = setup_driver()
+    facebook_links = get_facebook_links()
+    chrom_driver = get_tuned_driver()
     try:
         with pymongo.MongoClient(f'mongodb://mongo', 27017) as mongo_client:
             mongo_db = mongo_client['owl_project']
-            main(chrom_driver, mongo_db)
+            main(chrom_driver, facebook_links, mongo_db)
     except Exception:
         chrom_driver.close()
         raise

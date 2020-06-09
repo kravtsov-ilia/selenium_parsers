@@ -1,20 +1,25 @@
 import logging
+from typing import TYPE_CHECKING, Tuple
 
 from selenium.common.exceptions import NoSuchElementException
 
 from selenium_parsers.utils.selenium_utils import write_text
 
+if TYPE_CHECKING:
+    from selenium.webdriver.chrome.webdriver import WebDriver
+    from selenium.webdriver.remote.webelement import WebElement
+
 logger = logging.getLogger(__name__)
 
 
-def get_design_full_login_elements(driver):
+def get_design_full_login_elements(driver: 'WebDriver') -> Tuple['WebElement', 'WebElement', 'WebElement']:
     email_field = driver.find_element_by_xpath('//input[@data-testid="royal_email"]')
     password_field = driver.find_element_by_xpath('//input[@data-testid="royal_pass"]')
     submit_btn = driver.find_element_by_xpath('//input[@data-testid="royal_login_button"]')
     return email_field, password_field, submit_btn
 
 
-def get_design_min_login_elements(driver):
+def get_design_min_login_elements(driver: 'WebDriver') -> Tuple['WebElement', 'WebElement', 'WebElement']:
     email_field = driver.find_element_by_xpath('//input[@id="email"]')
     password_field = driver.find_element_by_xpath('//input[@id="pass"]')
     submit_btn = driver.find_element_by_xpath('//input[@type="submit"]')
@@ -22,11 +27,12 @@ def get_design_min_login_elements(driver):
 
 
 def input_login_data(
-        driver,
-        user_email,
-        user_passwd,
-        email_field, password_field,
-        submit_btn
+        driver: 'WebDriver',
+        user_email: str,
+        user_passwd: str,
+        email_field: 'WebElement',
+        password_field: 'WebElement',
+        submit_btn: 'WebElement'
 ):
     write_text(driver, email_field, user_email)
     write_text(driver, password_field, user_passwd)
