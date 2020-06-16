@@ -1,18 +1,22 @@
 #!/usr/bin python
 import datetime
+import logging
 import os
-import sys
+import random
+import string
 from time import sleep
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Dict
 
+import environ
 import psycopg2
 import pymongo
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver import DesiredCapabilities
+from selenium.webdriver import DesiredCapabilities, Proxy
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.proxy import ProxyType
 
-from selenium_parsers.facebook import logger
+from selenium_parsers.facebook.facebook_logger import setup_fb_logger
 from selenium_parsers.facebook.utils.general import FacebookParseError
 from selenium_parsers.facebook.utils.login import login
 from selenium_parsers.facebook.utils.page import get_display_name, get_club_id, get_club_icon, \
@@ -25,6 +29,19 @@ if TYPE_CHECKING:
     from selenium.webdriver.chrome.webdriver import WebDriver
     from selenium.webdriver.remote.webelement import WebElement
 
+env = environ.Env(
+    DJANGO_DEBUG=(bool, False),
+    USE_PROXY=(bool, True)
+)
+DEBUG = env('DJANGO_DEBUG')
+USE_PROXY = env('USE_PROXY')
+SCREENSHOTS_DIR = env('SCREENSHOTS_DIR')
+
+logger = logging.getLogger('facebook_parser')
+logger.info(f'USE_PROXY {USE_PROXY}')
+logger.info(f'DEBUG {DEBUG}')
+logger.info(f'SCREENSHOTS_DIR {SCREENSHOTS_DIR}')
+
 
 def get_tuned_driver() -> 'WebDriver':
     os.environ["DISPLAY"] = ':99'
@@ -32,28 +49,35 @@ def get_tuned_driver() -> 'WebDriver':
     chrome_options = Options()
     prefs = {"profile.default_content_setting_values.notifications": 2}
     chrome_options.add_experimental_option('prefs', prefs)
+    chrome_options.add_argument("--window-size=1220x1080")
 
     capabilities = DesiredCapabilities.CHROME
     capabilities['goog:loggingPrefs'] = {'browser': 'ALL'}
+    if USE_PROXY:
+        prox = Proxy()
+        prox.proxy_type = ProxyType.MANUAL
+        proxy_ip = os.environ.get('FACEBOOK_PROXY_IP_1')
+        proxy_port = os.environ.get('FACEBOOK_PROXY_PORT_1')
+        prox.http_proxy = f"{proxy_ip}:{proxy_port}"
+        prox.ssl_proxy = f"{proxy_ip}:{proxy_port}"
 
-    if sys.platform == 'darwin':
-        chrome_options.add_argument("--window-size=1220x1080")
+        prox.add_to_capabilities(capabilities)
+
+        logger.info(f'facebook parser use proxy: {proxy_ip}')
+    if DEBUG:
         driver = webdriver.Chrome(
             options=chrome_options,
             desired_capabilities=capabilities
         )
     else:
-        chrome_driver_binary = "/usr/bin/chromedriver"
         chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--window-size=1920x1080")
-        chrome_options.add_argument("start-maximized")
-        chrome_options.add_argument("disable-infobars")
+        chrome_options.add_argument("--remote-debugging-port=9222")
+        chrome_options.add_argument("--disable-infobars")
         chrome_options.add_argument("--disable-extensions")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--no-sandbox")
 
         driver = webdriver.Chrome(
-            chrome_driver_binary,
             options=chrome_options,
             desired_capabilities=capabilities
         )
@@ -62,7 +86,7 @@ def get_tuned_driver() -> 'WebDriver':
     return driver
 
 
-def parse_post(post: 'WebElement', club_id: str):
+def parse_post(post: 'WebElement', club_id: str) -> Dict:
     post_short_text = get_post_short_text(post)
     try:
         post_id = generate_post_id(post_short_text)
@@ -95,18 +119,22 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
     facebook_posts_data = database['facebook_posts_data']
 
     driver.get('https://facebook.com')
+    sleep(2)
     user_email = os.environ.get('FB_USERNAME')
     user_passwd = os.environ.get('FB_PASSWD')
-
-    login(driver, user_email, user_passwd)
-    sleep(3)
+    login(driver, user_email, user_passwd, 'Иван')
+    parsed_pages = 0
     for link in facebook_pages:
         logger.info(f'starting to parse {link}')
-        driver.get(f'{link}/posts/')
-        sleep(3)
+        url_name = link.split('/')[-1]
+        if link[-1] == '/':
+            link = link[:-1]
+        page_posts_link = f'{link}/posts/'
+        driver.get(page_posts_link)
+        sleep(2)
         try:
-            display_name = get_display_name(driver) or link.split('/')[-1]
-            club_id = get_club_id(driver)
+            display_name = get_display_name(driver) or url_name
+            club_id = get_club_id(driver) or url_name
             club_icon = get_club_icon(driver, club_id)
 
             members_cnt, page_likes_cnt = get_members_and_page_like_count(driver, driver.current_url)
@@ -138,6 +166,7 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
 
             page_data = {
                 'club_id': club_id,
+                'page_link': link,
                 'posts_count': total_posts_counter,
                 'members_count': members_cnt,
                 'photo': club_icon,
@@ -152,6 +181,17 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
 
         except (FacebookParseError, NoSuchElementException):
             logger.error(f'cant parse facebook page {link}', exc_info=True)
+            code = ''.join(random.choice(string.hexdigits) for _ in range(5))
+            logger.error(f'incident code: {code}', exc_info=True)
+            screen_path = os.path.join(SCREENSHOTS_DIR, f'facebook_screenshot_{code}.png')
+            chrom_driver.save_screenshot(screen_path)
+        else:
+            parsed_pages += 1
+
+    logger.info(
+        f'facebook parsing is finish, {parsed_pages} - pages was parsed, '
+        f'total pages: {len(facebook_links)}'
+    )
 
 
 def get_facebook_links() -> List[str]:
@@ -164,7 +204,7 @@ def get_facebook_links() -> List[str]:
     fb_links = []
     try:
         cursor = connection.cursor()
-        cursor.execute("SELECT page_link FROM api_facebookpage")
+        cursor.execute('SELECT page_link FROM api_facebookpage')
         for fb_record in cursor.fetchall():
             fb_links.append(fb_record[0])
     finally:
@@ -173,10 +213,13 @@ def get_facebook_links() -> List[str]:
 
 
 if __name__ == '__main__':
+    if not DEBUG:
+        setup_fb_logger()
+
     facebook_links = get_facebook_links()
     chrom_driver = get_tuned_driver()
     try:
-        with pymongo.MongoClient(f'mongodb://mongo', 27017) as mongo_client:
+        with pymongo.MongoClient('mongodb://mongo', 27017) as mongo_client:
             mongo_db = mongo_client['owl_project']
             main(chrom_driver, facebook_links, mongo_db)
     except Exception:

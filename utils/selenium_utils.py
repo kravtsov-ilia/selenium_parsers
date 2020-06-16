@@ -7,6 +7,13 @@ if TYPE_CHECKING:
     from selenium.webdriver.remote.webelement import WebElement
 
 
-def write_text(driver: 'WebDriver', element: 'WebElement', text: str) -> None:
+def write_text(
+        driver: 'WebDriver',
+        element: 'WebElement',
+        text: str,
+) -> None:
+    """
+    Send text like a user
+    """
     element.click()
     ActionChains(driver).send_keys(text).perform()

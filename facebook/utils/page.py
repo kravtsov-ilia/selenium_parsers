@@ -1,6 +1,6 @@
 import logging
 from time import sleep
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.keys import Keys
@@ -11,10 +11,13 @@ if TYPE_CHECKING:
     from selenium.webdriver.chrome.webdriver import WebDriver
     from selenium.webdriver.remote.webelement import WebElement  # noqa: F401
 
-logger = logging.getLogger('selenium_parser')
+logger = logging.getLogger('facebook_parser')
 
 
 def get_club_icon(driver: 'WebDriver', club_id: str) -> str:
+    """
+    Get facebook page icon
+    """
     try:
         fb_icon_block = driver.find_elements_by_xpath('//div[@id="entity_sidebar"]')[0]
         fb_icon_link = fb_icon_block.find_elements_by_xpath('.//img')[0].get_attribute('src')
@@ -24,36 +27,86 @@ def get_club_icon(driver: 'WebDriver', club_id: str) -> str:
     return fb_icon_link
 
 
-def get_members_and_page_like_count(driver: 'WebDriver', redirect_location: str) -> tuple:
+def get_page_info_from_members_and_likes_page_widget(
+        driver: 'WebDriver',
+        redirect_location: str
+) -> Tuple[int, int]:
+    """
+    Use community widget for extract page likes and members
+    """
+    driver.find_element_by_xpath('//div/a[@data-endpoint]/span[contains(text(), "Главная")]').click()
+    sidebar_el = driver.find_element_by_xpath('//div[@id="pages_side_column"]')
+    likes_child_el = sidebar_el.find_element_by_xpath('.//div[contains(text(), "Нравится ")]')
+    members_child_el = sidebar_el.find_element_by_xpath('.//div[contains(text(), "Подписан")]')
+    likes_text = likes_child_el.text
+    members_text = members_child_el.text
+    likes_str = ''.join([c for c in likes_text if c.isdigit()])
+    members_str = ''.join([c for c in members_text if c.isdigit()])
+
+    driver.get(redirect_location)
+    sleep(2)
+    return int(likes_str), int(members_str)
+
+
+def get_page_info_by_members_page_visit(
+        driver: 'WebDriver',
+        redirect_location: str
+) -> Tuple[int, int]:
+    """
+    Use community page for extract page likes and members
+    """
     driver.find_element_by_xpath('//div/a[@data-endpoint]/span[contains(text(), "Сообщество")]').click()
     sleep(3)
     members_child_el = driver.find_element_by_xpath('//div[contains(text(), "Всего подписчиков")]')
     likes_child_el = driver.find_element_by_xpath('//div[contains(text(), "Всего отметок")]')
-    result = []
-    for block in [members_child_el, likes_child_el]:
+    likes_cnt = 0
+    members_cnt = 0
+    for slug, block in (('members', members_child_el), ('likes', likes_child_el)):
         block = block.find_element_by_xpath('..')
         cnt = int(block.find_elements_by_xpath('.//div')[0].text.replace(' ', ''))
-        result.append(cnt)
-
+        if slug == 'members':
+            members_cnt = cnt
+        elif slug == 'likes':
+            likes_cnt = cnt
     driver.get(redirect_location)
-    sleep(3)
-    return tuple(result)
+    return likes_cnt, members_cnt
+
+
+def get_members_and_page_like_count(driver: 'WebDriver', redirect_location: str) -> Tuple[int, int]:
+    """
+    Parse page likes and members count
+    """
+    methods = (
+        get_page_info_from_members_and_likes_page_widget,
+        get_page_info_by_members_page_visit
+    )
+    for i, method in enumerate(methods, start=1):
+        try:
+            likes, members = method(driver, redirect_location)
+        except NoSuchElementException:
+            logger.warning(f'can not parse members and likes page info try {i}')
+        else:
+            return likes, members
+    logger.critical('can not parse page info: likes and members count')
+    raise FacebookParseError
 
 
 def get_post_parent_selector(driver: 'WebDriver') -> str:
-    likes_blocks = driver.find_elements_by_xpath(f'//*[contains(text(), "Нравится")]')
-    comments_blocks = driver.find_elements_by_xpath(f'//*[contains(text(), "Комментировать")]')
-    shares_blocks = driver.find_elements_by_xpath(f'//*[contains(text(), "Поделиться")]')
+    """
+    Find posts parent container
+    """
+    likes_blocks = driver.find_elements_by_xpath('//*[contains(text(), "Нравится")]')
+    comments_blocks = driver.find_elements_by_xpath('//*[contains(text(), "Комментировать")]')
+    shares_blocks = driver.find_elements_by_xpath('//*[contains(text(), "Поделиться")]')
 
     if len(likes_blocks) <= 0 or len(comments_blocks) <= 0 or len(shares_blocks) <= 0:
-        logger.critical(
+        raise FacebookParseError(
             f'can not parse reactions parent node, '
             f'some block was not found: '
             f'{len(likes_blocks)}, '
             f'{len(comments_blocks)}, '
             f'{len(shares_blocks)}'
         )
-        exit(-1)
 
     ancestor = comments_blocks[len(comments_blocks) // 2]
 
@@ -75,6 +128,9 @@ def get_post_parent_selector(driver: 'WebDriver') -> str:
 
 
 def scroll_while_post_loaded(driver: 'WebDriver', posts_selector: str) -> None:
+    """
+    Scroll page while posts are loading or max iteration was reached
+    """
     prev_posts_count = len(driver.find_elements_by_css_selector(posts_selector))
 
     current_posts_count = 0
@@ -89,13 +145,16 @@ def scroll_while_post_loaded(driver: 'WebDriver', posts_selector: str) -> None:
         html = driver.find_element_by_tag_name('html')
         for _ in range(4):
             html.send_keys(Keys.END)
-            sleep(0.1)
+            sleep(0.3)
         sleep(2)
         prev_posts_count = current_posts_count
         current_posts_count = len(driver.find_elements_by_css_selector(posts_selector))
 
 
 def extract_posts(driver: 'WebDriver', posts_selector: str) -> List['WebElement']:
+    """
+    Return only posts items, filter other instances
+    """
     elements = driver.find_elements_by_css_selector(posts_selector)
     posts = []
     for element in elements:
@@ -107,6 +166,9 @@ def extract_posts(driver: 'WebDriver', posts_selector: str) -> List['WebElement'
 
 
 def get_display_name(driver: 'WebDriver') -> Optional[str]:
+    """
+    Get page display name
+    """
     display_name_selectors = (
         '//h1[@id="seo_h1_tag"]/a/span',
         '//h1[@id="seo_h1_tag"]',
@@ -123,5 +185,13 @@ def get_display_name(driver: 'WebDriver') -> Optional[str]:
     logger.error('can not parse group display name')
 
 
-def get_club_id(driver: 'WebDriver') -> str:
-    return driver.find_element_by_xpath('//div/a[@href="#"][contains(text(), "@")]').text
+def get_club_id(driver: 'WebDriver') -> Optional[str]:
+    """
+    Get page unique name
+    """
+    try:
+        club_id = driver.find_element_by_xpath('//div/a[@href="#"][contains(text(), "@")]').text
+    except NoSuchElementException:
+        logger.warning('no such club id')
+        club_id = None
+    return club_id
