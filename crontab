@@ -1,0 +1,2 @@
+*/1 * * * * echo 'crontab is working' > /tmp/check_file.txt
+30 3,7,9,11,13,15,17,19,21,23 * * * python /opt/selenium_parsers/facebook/groups_parser.py >> /var/log/cron.log 2>&1

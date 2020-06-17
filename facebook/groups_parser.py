@@ -213,8 +213,7 @@ def get_facebook_links() -> List[str]:
 
 
 if __name__ == '__main__':
-    if not DEBUG:
-        setup_fb_logger()
+    setup_fb_logger()
 
     facebook_links = get_facebook_links()
     chrom_driver = get_tuned_driver()
