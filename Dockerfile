@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED 1
 
 ENV MUSL_LOCPATH=/usr/local/share/i18n/locales/musl
 RUN \
- apk add --update git cmake make musl-dev gcc gettext-dev libintl xvfb && \
+ apk add --update cmake make musl-dev gcc gettext-dev libintl xvfb git python3-dev linux-headers && \
  cd /tmp && git clone https://gitlab.com/rilian-la-te/musl-locales.git && \
  cd /tmp/musl-locales && cmake . && make && make install
 

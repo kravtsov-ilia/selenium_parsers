@@ -3,11 +3,14 @@ import datetime
 import logging
 import os
 import random
+import signal
 import string
+from pathlib import Path
 from time import sleep
 from typing import List, TYPE_CHECKING, Dict
 
 import environ
+import psutil
 import psycopg2
 import pymongo
 from selenium import webdriver
@@ -36,6 +39,7 @@ env = environ.Env(
 DEBUG = env('DJANGO_DEBUG')
 USE_PROXY = env('USE_PROXY')
 SCREENSHOTS_DIR = env('SCREENSHOTS_DIR')
+PID_PATH = env('PID_PATH')
 
 logger = logging.getLogger('facebook_parser')
 logger.info(f'USE_PROXY {USE_PROXY}')
@@ -212,11 +216,54 @@ def get_facebook_links() -> List[str]:
     return fb_links
 
 
-if __name__ == '__main__':
-    setup_fb_logger()
+def terminate_old_process(file_path: str) -> None:
+    with open(file_path, 'r') as f:
+        logger.info('try to terminate old process')
+        for pid in f.readlines():
+            try:
+                pid = int(pid)
+                logger.info(f'try to terminate process pid={pid}')
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                logger.info(f'previous process was not found, pid={pid}')
+            except ValueError:
+                logger.warning(f'can not read process pid from file, proc pid={pid}')
+            else:
+                logger.warning(f'process with pid={pid} was terminated by timeout')
 
+
+def save_driver_pid(driver: 'WebDriver', file_path: str) -> None:
+    chrom_process = psutil.Process(driver.service.process.pid)
+    with open(file_path, 'w') as f:
+        python_script_pid = os.getpid()
+        f.write(f'{python_script_pid}\n')
+        f.write(f'{chrom_process.pid}\n')
+        for proc in chrom_process.children(recursive=True):
+            f.write(f'{proc.pid}\n')
+
+
+def create_chrome_driver() -> 'WebDriver':
+    pid_file = os.path.join(PID_PATH, 'facebook_chrome.pid')
+    Path(pid_file).touch()
+    terminate_old_process(pid_file)
+    driver = get_tuned_driver()
+    save_driver_pid(driver, pid_file)
+    return driver
+
+
+def receive_signal(sig_numb: int, frame: object) -> None:
+    logger.critical(f'Received signal: {sig_numb}\nBye! ')
+    exit(-sig_numb)
+
+
+if __name__ == '__main__':
+    # set signal handlers
+    signal.signal(signal.SIGTERM, receive_signal)
+    signal.signal(signal.SIGHUP, receive_signal)
+
+    setup_fb_logger()
     facebook_links = get_facebook_links()
-    chrom_driver = get_tuned_driver()
+    chrom_driver = create_chrome_driver()
     try:
         with pymongo.MongoClient('mongodb://mongo', 27017) as mongo_client:
             mongo_db = mongo_client['owl_project']
