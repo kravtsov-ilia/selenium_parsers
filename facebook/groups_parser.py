@@ -131,6 +131,7 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
     for link in facebook_pages:
         logger.info(f'starting to parse {link}')
         url_name = link.split('/')[-1]
+        source_link = link
         if link[-1] == '/':
             link = link[:-1]
         page_posts_link = f'{link}/posts/'
@@ -170,7 +171,7 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
 
             page_data = {
                 'club_id': club_id,
-                'page_link': link,
+                'page_link': source_link,
                 'posts_count': total_posts_counter,
                 'members_count': members_cnt,
                 'photo': club_icon,
