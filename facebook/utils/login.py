@@ -22,20 +22,20 @@ def get_design_full_login_elements(driver: 'WebDriver') -> Tuple['WebElement', '
     """
     Old design login page
     """
-    email_field = driver.find_element_by_xpath('//input[@data-testid="royal_email"]')
+    login_field = driver.find_element_by_xpath('//input[@data-testid="royal_email"]')
     password_field = driver.find_element_by_xpath('//input[@data-testid="royal_pass"]')
     submit_btn = driver.find_element_by_xpath('//input[@data-testid="royal_login_button"]')
-    return email_field, password_field, submit_btn
+    return login_field, password_field, submit_btn
 
 
 def get_design_min_login_elements(driver: 'WebDriver') -> Tuple['WebElement', 'WebElement', 'WebElement']:
     """
     New design login page
     """
-    email_field = driver.find_element_by_xpath('//input[@id="email"]')
+    login_field = driver.find_element_by_xpath('//input[@id="email"]')
     password_field = driver.find_element_by_xpath('//input[@id="pass"]')
     submit_btn = driver.find_element_by_xpath('//input[@type="submit"]')
-    return email_field, password_field, submit_btn
+    return login_field, password_field, submit_btn
 
 
 def get_design_special_page(driver: 'WebDriver') -> Tuple['WebElement', 'WebElement', 'WebElement']:
@@ -46,31 +46,31 @@ def get_design_special_page(driver: 'WebDriver') -> Tuple['WebElement', 'WebElem
         'https://www.facebook.com/login/device-based/regular/login/?login_attempt=1&lwv=110'
     )
     sleep(2)
-    email_field = driver.find_element_by_xpath('//input[@id="email"]')
+    login_field = driver.find_element_by_xpath('//input[@id="email"]')
     password_field = driver.find_element_by_xpath('//input[@id="pass"]')
     submit_btn = driver.find_element_by_xpath('//button[@id="loginbutton"]')
-    return email_field, password_field, submit_btn
+    return login_field, password_field, submit_btn
 
 
 def input_login_data(
         driver: 'WebDriver',
-        user_email: str,
+        user_login: str,
         user_passwd: str,
-        email_field: 'WebElement',
+        login_field: 'WebElement',
         password_field: 'WebElement',
         submit_btn: 'WebElement'
 ):
     """
     Input login data to elements
     """
-    write_text(driver, email_field, user_email)
+    write_text(driver, login_field, user_login)
     write_text(driver, password_field, user_passwd)
     submit_btn.click()
 
 
 def login_blindly(
         driver: 'WebDriver',
-        user_email: str,
+        user_login: str,
         user_passwd: str,
         login_display_name: str
 ) -> None:
@@ -80,7 +80,7 @@ def login_blindly(
     logger.info('try blindly login')
     driver.get('https://www.facebook.com/login')
     sleep(2)
-    ActionChains(driver).send_keys(user_email).perform()
+    ActionChains(driver).send_keys(user_login).perform()
     ActionChains(driver).send_keys(Keys.TAB).perform()
     ActionChains(driver).send_keys(user_passwd).perform()
     ActionChains(driver).send_keys(Keys.ENTER).perform()
@@ -91,7 +91,7 @@ def login_blindly(
 
 def login(
         driver: 'WebDriver',
-        user_email: str,
+        user_login: str,
         user_passwd: str,
         login_display_name: str
 ) -> None:
@@ -105,12 +105,12 @@ def login(
     )
     for i, scheme in enumerate(facebook_design_schemes, start=1):
         try:
-            email_field, password_field, submit_btn = scheme(driver)
+            login_field, password_field, submit_btn = scheme(driver)
             input_login_data(
                 driver,
-                user_email,
+                user_login,
                 user_passwd,
-                email_field,
+                login_field,
                 password_field,
                 submit_btn
             )
@@ -124,4 +124,4 @@ def login(
         else:
             logger.info(f'use {i} design scheme for login')
             return
-    login_blindly(driver, user_email, user_passwd, login_display_name)
+    login_blindly(driver, user_login, user_passwd, login_display_name)

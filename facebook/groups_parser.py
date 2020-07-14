@@ -10,9 +10,8 @@ from time import sleep
 from typing import List, TYPE_CHECKING, Dict
 
 import environ
-import psutil
-import psycopg2
 import pymongo
+import requests
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver import DesiredCapabilities, Proxy
@@ -20,12 +19,15 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.proxy import ProxyType
 
 from selenium_parsers.facebook.facebook_logger import setup_fb_logger
+from selenium_parsers.facebook.utils.database import update_proxy_status, AccessStatus, update_account_status, \
+    get_facebook_links, get_facebook_proxy, get_facebook_account
 from selenium_parsers.facebook.utils.general import FacebookParseError
 from selenium_parsers.facebook.utils.login import login
 from selenium_parsers.facebook.utils.page import get_display_name, get_club_id, get_club_icon, \
     get_members_and_page_like_count, get_post_parent_selector, scroll_while_post_loaded, extract_posts
 from selenium_parsers.facebook.utils.post import get_post_short_text, generate_post_id, get_likes_count, \
     get_actions_count, get_post_img, get_post_date
+from selenium_parsers.facebook.utils.process import terminate_old_process, save_driver_pid, receive_signal
 
 if TYPE_CHECKING:
     from pymongo.database import Database
@@ -60,14 +62,28 @@ def get_tuned_driver() -> 'WebDriver':
     if USE_PROXY:
         prox = Proxy()
         prox.proxy_type = ProxyType.MANUAL
-        proxy_ip = os.environ.get('FACEBOOK_PROXY_IP_1')
-        proxy_port = os.environ.get('FACEBOOK_PROXY_PORT_1')
+        proxy_ip, proxy_port = get_facebook_proxy()
         prox.http_proxy = f"{proxy_ip}:{proxy_port}"
         prox.ssl_proxy = f"{proxy_ip}:{proxy_port}"
-
+        try:
+            response = requests.get(
+                'https://google.com',
+                proxies={
+                    'http': f'{proxy_ip}:{proxy_port}',
+                    'https': f'{proxy_ip}:{proxy_port}',
+                }
+            )
+        except requests.RequestException:
+            update_proxy_status(proxy_ip, AccessStatus.fail)
+            raise
+        if response.status_code != 200:
+            update_proxy_status(proxy_ip, AccessStatus.fail)
+            logger.critical(f'proxy {proxy_ip}:{proxy_port} not work')
+            exit(-1)
+        update_proxy_status(proxy_ip, AccessStatus.success)
         prox.add_to_capabilities(capabilities)
 
-        logger.info(f'facebook parser use proxy: {proxy_ip}')
+        logger.info(f'facebook parser use proxy: {proxy_ip}:{proxy_port}')
     if DEBUG:
         driver = webdriver.Chrome(
             options=chrome_options,
@@ -124,9 +140,16 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
 
     driver.get('https://facebook.com')
     sleep(2)
-    user_email = os.environ.get('FB_USERNAME')
-    user_passwd = os.environ.get('FB_PASSWD')
-    login(driver, user_email, user_passwd, 'Иван')
+    account_name, account_login, account_password, account_cookies = get_facebook_account()
+    for cookie in account_cookies:
+        driver.add_cookie(cookie)
+
+    try:
+        login(driver, account_login, account_password, account_name)
+    except NoSuchElementException:
+        update_account_status(account_login, AccessStatus.fail)
+    update_account_status(account_login, AccessStatus.success)
+
     parsed_pages = 0
     for link in facebook_pages:
         logger.info(f'starting to parse {link}')
@@ -199,50 +222,6 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
     )
 
 
-def get_facebook_links() -> List[str]:
-    connection = psycopg2.connect(
-        dbname=os.getenv('POSTGRES_NAME'),
-        user=os.getenv('POSTGRES_USER'),
-        password=os.getenv('POSTGRES_PASS'),
-        host='postgres'
-    )
-    fb_links = []
-    try:
-        cursor = connection.cursor()
-        cursor.execute('SELECT page_link FROM api_facebookpage')
-        for fb_record in cursor.fetchall():
-            fb_links.append(fb_record[0])
-    finally:
-        connection.close()
-    return fb_links
-
-
-def terminate_old_process(file_path: str) -> None:
-    with open(file_path, 'r') as f:
-        logger.info('try to terminate old process')
-        for pid in f.readlines():
-            try:
-                pid = int(pid)
-                logger.info(f'try to terminate process pid={pid}')
-                os.kill(pid, signal.SIGTERM)
-            except ProcessLookupError:
-                logger.info(f'previous process was not found, pid={pid}')
-            except ValueError:
-                logger.warning(f'can not read process pid from file, proc pid={pid}')
-            else:
-                logger.warning(f'process with pid={pid} was terminated by timeout')
-
-
-def save_driver_pid(driver: 'WebDriver', file_path: str) -> None:
-    chrom_process = psutil.Process(driver.service.process.pid)
-    with open(file_path, 'w') as f:
-        python_script_pid = os.getpid()
-        f.write(f'{python_script_pid}\n')
-        f.write(f'{chrom_process.pid}\n')
-        for proc in chrom_process.children(recursive=True):
-            f.write(f'{proc.pid}\n')
-
-
 def create_chrome_driver() -> 'WebDriver':
     pid_file = os.path.join(PID_PATH, 'facebook_chrome.pid')
     Path(pid_file).touch()
@@ -250,11 +229,6 @@ def create_chrome_driver() -> 'WebDriver':
     driver = get_tuned_driver()
     save_driver_pid(driver, pid_file)
     return driver
-
-
-def receive_signal(sig_numb: int, frame: object) -> None:
-    logger.critical(f'Received signal: {sig_numb}\nBye! ')
-    exit(-sig_numb)
 
 
 if __name__ == '__main__':
