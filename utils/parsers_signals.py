@@ -1,7 +1,7 @@
 import logging
 import os
 import signal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import psutil
 
@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def terminate_old_process(file_path: str) -> None:
-    with open(file_path, 'r') as f:
+def terminate_old_process(pid_file_path: str) -> None:
+    with open(pid_file_path, 'r') as f:
         logger.info('try to terminate old process')
         for pid in f.readlines():
             try:
@@ -37,6 +37,17 @@ def save_driver_pid(driver: 'WebDriver', file_path: str) -> None:
             f.write(f'{proc.pid}\n')
 
 
-def receive_signal(sig_numb: int, frame: object) -> None:
+def process_terminate(sig_numb: int, frame: object) -> None:
+    """
+    Force terminate process if some signal was receive
+    """
     logger.critical(f'Received signal: {sig_numb}\nBye! ')
     exit(-sig_numb)
+
+
+def setup_signals_handlers(handler: Callable) -> None:
+    """
+    Setup signal handlers
+    """
+    signal.signal(signal.SIGTERM, handler)
+    signal.signal(signal.SIGHUP, handler)

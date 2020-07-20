@@ -9,6 +9,8 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
+from selenium_parsers.facebook.utils.database import update_account_status
+from selenium_parsers.utils.constants import AccessStatus
 from selenium_parsers.utils.selenium_utils import write_text
 
 if TYPE_CHECKING:
@@ -73,7 +75,7 @@ def login_blindly(
         user_login: str,
         user_passwd: str,
         login_display_name: str
-) -> None:
+) -> bool:
     """
     Login without searching for items
     """
@@ -84,20 +86,22 @@ def login_blindly(
     ActionChains(driver).send_keys(Keys.TAB).perform()
     ActionChains(driver).send_keys(user_passwd).perform()
     ActionChains(driver).send_keys(Keys.ENTER).perform()
-    WebDriverWait(driver, 5).until(
-        EC.presence_of_element_located((By.XPATH, f'//span[contains(text(), "{login_display_name}")]'))
-    )
+    try:
+        WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.XPATH, f'//span[contains(text(), "{login_display_name}")]'))
+        )
+    except NoSuchElementException:
+        return False
+    else:
+        return True
 
 
-def login(
+def look_over_login_pages(
         driver: 'WebDriver',
         user_login: str,
         user_passwd: str,
         login_display_name: str
-) -> None:
-    """
-    Try to login user by several login schemes
-    """
+):
     facebook_design_schemes = (
         get_design_full_login_elements,
         get_design_min_login_elements,
@@ -123,5 +127,21 @@ def login(
             logger.warning(f'design scheme {i} timeout')
         else:
             logger.info(f'use {i} design scheme for login')
-            return
-    login_blindly(driver, user_login, user_passwd, login_display_name)
+            return True
+    return False
+
+
+def login(
+        driver: 'WebDriver',
+        user_login: str,
+        user_passwd: str,
+        login_display_name: str
+) -> None:
+    """
+    Try to login user by several login schemes
+    """
+    was_login = look_over_login_pages or login_blindly(driver, user_login, user_passwd, login_display_name)
+    if was_login:
+        update_account_status(user_login, AccessStatus.success)
+    else:
+        update_account_status(user_login, AccessStatus.fail)

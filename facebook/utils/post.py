@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 def get_post_short_text(post_el: 'WebElement') -> str:
     """
-    Get post short
+    Get post visible text
     """
     post_el_text = post_el.text
     post_el_text_lines = post_el_text.split('\n')

@@ -127,11 +127,11 @@ def get_post_parent_selector(driver: 'WebDriver') -> str:
     raise FacebookParseError('cant not find main post ancestor')
 
 
-def scroll_while_post_loaded(driver: 'WebDriver', posts_selector: str) -> None:
+def scroll_while_loading(driver: 'WebDriver', posts_css_selector: str) -> None:
     """
     Scroll page while posts are loading or max iteration was reached
     """
-    prev_posts_count = len(driver.find_elements_by_css_selector(posts_selector))
+    prev_posts_count = len(driver.find_elements_by_css_selector(posts_css_selector))
 
     current_posts_count = 0
     max_iteration_count = 100
@@ -148,7 +148,7 @@ def scroll_while_post_loaded(driver: 'WebDriver', posts_selector: str) -> None:
             sleep(0.3)
         sleep(2)
         prev_posts_count = current_posts_count
-        current_posts_count = len(driver.find_elements_by_css_selector(posts_selector))
+        current_posts_count = len(driver.find_elements_by_css_selector(posts_css_selector))
 
 
 def extract_posts(driver: 'WebDriver', posts_selector: str) -> List['WebElement']:

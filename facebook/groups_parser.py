@@ -3,31 +3,26 @@ import datetime
 import logging
 import os
 import random
-import signal
 import string
-from pathlib import Path
 from time import sleep
 from typing import List, TYPE_CHECKING, Dict
 
 import environ
 import pymongo
-import requests
-from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver import DesiredCapabilities, Proxy
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.proxy import ProxyType
 
 from selenium_parsers.facebook.facebook_logger import setup_fb_logger
-from selenium_parsers.facebook.utils.database import update_proxy_status, AccessStatus, update_account_status, \
-    get_facebook_links, get_facebook_proxy, get_facebook_account
+from selenium_parsers.facebook.utils.database import get_facebook_proxy, get_facebook_account
 from selenium_parsers.facebook.utils.general import FacebookParseError
 from selenium_parsers.facebook.utils.login import login
 from selenium_parsers.facebook.utils.page import get_display_name, get_club_id, get_club_icon, \
-    get_members_and_page_like_count, get_post_parent_selector, scroll_while_post_loaded, extract_posts
+    get_members_and_page_like_count, get_post_parent_selector, scroll_while_loading, extract_posts
 from selenium_parsers.facebook.utils.post import get_post_short_text, generate_post_id, get_likes_count, \
     get_actions_count, get_post_img, get_post_date
-from selenium_parsers.facebook.utils.process import terminate_old_process, save_driver_pid, receive_signal
+from selenium_parsers.utils.database import get_selenium_links
+from selenium_parsers.utils.general import create_chrome_driver
+from selenium_parsers.utils.parsers_signals import setup_signals_handlers, \
+    process_terminate
 
 if TYPE_CHECKING:
     from pymongo.database import Database
@@ -47,63 +42,6 @@ logger = logging.getLogger('facebook_parser')
 logger.info(f'USE_PROXY {USE_PROXY}')
 logger.info(f'DEBUG {DEBUG}')
 logger.info(f'SCREENSHOTS_DIR {SCREENSHOTS_DIR}')
-
-
-def get_tuned_driver() -> 'WebDriver':
-    os.environ["DISPLAY"] = ':99'
-
-    chrome_options = Options()
-    prefs = {"profile.default_content_setting_values.notifications": 2}
-    chrome_options.add_experimental_option('prefs', prefs)
-    chrome_options.add_argument("--window-size=1220x1080")
-
-    capabilities = DesiredCapabilities.CHROME
-    capabilities['goog:loggingPrefs'] = {'browser': 'ALL'}
-    if USE_PROXY:
-        prox = Proxy()
-        prox.proxy_type = ProxyType.MANUAL
-        proxy_ip, proxy_port = get_facebook_proxy()
-        prox.http_proxy = f"{proxy_ip}:{proxy_port}"
-        prox.ssl_proxy = f"{proxy_ip}:{proxy_port}"
-        try:
-            response = requests.get(
-                'https://google.com',
-                proxies={
-                    'http': f'{proxy_ip}:{proxy_port}',
-                    'https': f'{proxy_ip}:{proxy_port}',
-                }
-            )
-        except requests.RequestException:
-            update_proxy_status(proxy_ip, AccessStatus.fail)
-            raise
-        if response.status_code != 200:
-            update_proxy_status(proxy_ip, AccessStatus.fail)
-            logger.critical(f'proxy {proxy_ip}:{proxy_port} not work')
-            exit(-1)
-        update_proxy_status(proxy_ip, AccessStatus.success)
-        prox.add_to_capabilities(capabilities)
-
-        logger.info(f'facebook parser use proxy: {proxy_ip}:{proxy_port}')
-    if DEBUG:
-        driver = webdriver.Chrome(
-            options=chrome_options,
-            desired_capabilities=capabilities
-        )
-    else:
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--remote-debugging-port=9222")
-        chrome_options.add_argument("--disable-infobars")
-        chrome_options.add_argument("--disable-extensions")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--no-sandbox")
-
-        driver = webdriver.Chrome(
-            options=chrome_options,
-            desired_capabilities=capabilities
-        )
-
-    driver.implicitly_wait(5)
-    return driver
 
 
 def parse_post(post: 'WebElement', club_id: str) -> Dict:
@@ -134,6 +72,11 @@ def parse_post(post: 'WebElement', club_id: str) -> Dict:
         raise
 
 
+def set_cookies(driver: 'WebDriver', cookies: List[dict]) -> None:
+    for cookie in cookies:
+        driver.add_cookie(cookie)
+
+
 def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -> None:
     facebook_pages_data = database['facebook_pages_data']
     facebook_posts_data = database['facebook_posts_data']
@@ -141,14 +84,9 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
     driver.get('https://facebook.com')
     sleep(2)
     account_name, account_login, account_password, account_cookies = get_facebook_account()
-    for cookie in account_cookies:
-        driver.add_cookie(cookie)
+    set_cookies(driver, account_cookies)
 
-    try:
-        login(driver, account_login, account_password, account_name)
-    except NoSuchElementException:
-        update_account_status(account_login, AccessStatus.fail)
-    update_account_status(account_login, AccessStatus.success)
+    login(driver, account_login, account_password, account_name)
 
     parsed_pages = 0
     for link in facebook_pages:
@@ -168,7 +106,7 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
             members_cnt, page_likes_cnt = get_members_and_page_like_count(driver, driver.current_url)
 
             posts_selector = get_post_parent_selector(driver)
-            scroll_while_post_loaded(driver, posts_selector)
+            scroll_while_loading(driver, posts_selector)
             posts = extract_posts(driver, posts_selector)
 
             total_posts_counter: int = 0
@@ -222,23 +160,28 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
     )
 
 
-def create_chrome_driver() -> 'WebDriver':
-    pid_file = os.path.join(PID_PATH, 'facebook_chrome.pid')
-    Path(pid_file).touch()
-    terminate_old_process(pid_file)
-    driver = get_tuned_driver()
-    save_driver_pid(driver, pid_file)
-    return driver
-
-
 if __name__ == '__main__':
-    # set signal handlers
-    signal.signal(signal.SIGTERM, receive_signal)
-    signal.signal(signal.SIGHUP, receive_signal)
+    setup_signals_handlers(process_terminate)
 
     setup_fb_logger()
-    facebook_links = get_facebook_links()
-    chrom_driver = create_chrome_driver()
+    facebook_links = get_selenium_links(
+        column_name='page_link',
+        table_name='api_facebookpage'
+    )
+    extra_params = {}
+    if USE_PROXY:
+        proxy_ip, proxy_port = get_facebook_proxy()
+        extra_params = {
+            'proxy_ip': proxy_ip,
+            'proxy_port': proxy_port
+        }
+
+    chrom_driver = create_chrome_driver(
+        pid_file_name='facebook_chrome.pid',
+        pid_file_path=PID_PATH,
+        logger=logger,
+        **extra_params
+    )
     try:
         with pymongo.MongoClient('mongodb://mongo', 27017) as mongo_client:
             mongo_db = mongo_client['owl_project']
