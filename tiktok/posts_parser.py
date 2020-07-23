@@ -169,20 +169,21 @@ class TikTokParser:
     def free(self):
         self._driver.close()
 
-    def parse_page(self, link):
-        logger.info(f'starting to parse {link}')
+    def parse_page(self, chan_link):
+        logger.info(f'starting to parse {chan_link}')
         with pymongo.MongoClient('mongodb://mongo', 27017) as mongo_client:
             mongo_db = mongo_client['owl_project']
             tiktok_posts_data = mongo_db['tiktok_posts_data']
-            for _ in self._posts(link):
+            for _ in self._posts(chan_link):
                 post_date = self._get_post_date()
                 image_link = self._get_post_pic()
                 content = self._get_post_content()
                 likes_count = self._get_likes_count()
                 comments_count = self._get_comments_count()
-
+                post_link = self._driver.current_url
                 post_data = {
-                    'post_link': link,
+                    'post_link': post_link,
+                    'chan_link': chan_link,
                     'datetime': post_date,
                     'post_pic': image_link,
                     'content': content,
