@@ -19,7 +19,7 @@ logger = logging.getLogger('selenium_worker')
 VHOST_NAME = 'selenium_worker_posts'
 
 env = environ.Env(
-    DEBUG=(bool, False),
+    DJANGO_DEBUG=(bool, False),
     USE_PROXY=(bool, True),
 )
 DEBUG = env('DJANGO_DEBUG')

@@ -19,7 +19,7 @@ from selenium_parsers.utils.parsers_signals import setup_signals_handlers, proce
 logger = logging.getLogger('tiktok_parser')
 
 env = environ.Env(
-    DEBUG=(bool, False),
+    DJANGO_DEBUG=(bool, False),
     USE_PROXY=(bool, False),
     TIKTOK_PROXY_IP=(Optional[str], None),
     TIKTOK_PROXY_PORT=(Optional[str], None)
