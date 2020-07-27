@@ -54,6 +54,7 @@ class TikTokParser:
         self._driver = get_tuned_driver(
             parser_name='tiktok parser',
             logger=logger,
+            headless=(not DEBUG),
             **extra_params
         )
 

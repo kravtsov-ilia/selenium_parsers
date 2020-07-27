@@ -1,8 +1,8 @@
+import datetime
 import os
-from pathlib import Path
+from json.encoder import JSONEncoder
 from typing import TYPE_CHECKING, Optional
 
-import environ
 import requests
 from selenium import webdriver
 from selenium.webdriver import DesiredCapabilities, Proxy
@@ -17,26 +17,42 @@ if TYPE_CHECKING:
     from logging import Logger
     from selenium.webdriver.chrome.webdriver import WebDriver
 
-env = environ.Env(
-    DJANGO_DEBUG=(bool, False),
-    USE_PROXY=(bool, True)
-)
-DEBUG = env('DJANGO_DEBUG')
-USE_PROXY = env('USE_PROXY')
+
+class CustomEncoder(JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (datetime.datetime, datetime.date, datetime.time)):
+            return obj.isoformat()
+        elif isinstance(obj, datetime.timedelta):
+            return (datetime.datetime.min + obj).time().isoformat()
+        return super().default(obj)
+
+
+def webdriver_singleton(func):
+    instance = None
+
+    def wrap(*args, **kwargs):
+        nonlocal instance
+        if not instance:
+            terminate_old_process(kwargs['pid_path'])
+            instance = func(*args, **kwargs)
+            save_driver_pid(instance, kwargs['pid_path'])
+        return instance
+    return wrap
 
 
 def create_chrome_driver(
     pid_file_path: str,
     pid_file_name: str,
     logger: 'Logger',
+    headless: bool = True,
     **extra_params
 ) -> 'WebDriver':
     pid_file = os.path.join(pid_file_path, f'{pid_file_name}')
-    Path(pid_file).touch()
     terminate_old_process(pid_file)
     driver = get_tuned_driver(
         parser_name='facebook parser',
         logger=logger,
+        headless=headless,
         **extra_params
     )
     save_driver_pid(driver, pid_file)
@@ -47,7 +63,8 @@ def get_tuned_driver(
         parser_name: str,
         logger: 'Logger',
         proxy_ip: Optional[str] = None,
-        proxy_port: Optional[str] = None
+        proxy_port: Optional[str] = None,
+        headless: bool = True
 ) -> 'WebDriver':
     os.environ["DISPLAY"] = ':99'
 
@@ -55,7 +72,7 @@ def get_tuned_driver(
 
     capabilities = DesiredCapabilities.CHROME
     capabilities['goog:loggingPrefs'] = {'browser': 'ALL'}
-    if USE_PROXY:
+    if proxy_ip and proxy_port:
         prox = Proxy()
         prox.proxy_type = ProxyType.MANUAL
         prox.http_proxy = f"{proxy_ip}:{proxy_port}"
@@ -79,12 +96,7 @@ def get_tuned_driver(
         prox.add_to_capabilities(capabilities)
 
         logger.info(f'{parser_name} use proxy: {proxy_ip}:{proxy_port}')
-    if DEBUG:
-        driver = webdriver.Chrome(
-            options=chrome_options,
-            desired_capabilities=capabilities
-        )
-    else:
+    if headless:
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--remote-debugging-port=9222")
@@ -93,6 +105,11 @@ def get_tuned_driver(
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--no-sandbox")
 
+        driver = webdriver.Chrome(
+            options=chrome_options,
+            desired_capabilities=capabilities
+        )
+    else:
         driver = webdriver.Chrome(
             options=chrome_options,
             desired_capabilities=capabilities

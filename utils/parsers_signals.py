@@ -1,6 +1,7 @@
 import logging
 import os
 import signal
+from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 import psutil
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def terminate_old_process(pid_file_path: str) -> None:
+    Path(pid_file_path).touch()
     with open(pid_file_path, 'r') as f:
         logger.info('try to terminate old process')
         for pid in f.readlines():

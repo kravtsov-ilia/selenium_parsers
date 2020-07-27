@@ -91,9 +91,42 @@ def get_members_and_page_like_count(driver: 'WebDriver', redirect_location: str)
     raise FacebookParseError
 
 
+def get_single_post_selector(driver: 'WebDriver') -> str:
+    """
+    Find posts parent container on single post page
+    """
+    comments_blocks = driver.find_elements_by_xpath('//*[contains(text(), "Комментарии")]')
+    shares_blocks = driver.find_elements_by_xpath('//*[contains(text(), "Поделились")]')
+
+    if len(comments_blocks) <= 0 or len(shares_blocks) <= 0:
+        raise FacebookParseError(
+            f'can not parse reactions parent node, '
+            f'some block was not found: '
+            f'{len(comments_blocks)}, '
+            f'{len(shares_blocks)}'
+        )
+
+    ancestor_container = comments_blocks[0]
+
+    i = 0
+    max_iteration_cnt = 100
+    while i < max_iteration_cnt:
+        i += 1
+        previous_parent = ancestor_container
+        ancestor = ancestor_container.find_element_by_xpath('..')
+
+        comments_cnt = len(ancestor.find_elements_by_xpath('.//*[contains(text(), "Комментировать")]'))
+        shares_cnt = len(ancestor.find_elements_by_xpath('.//*[contains(text(), "Поделиться")]'))
+
+        if comments_cnt == 1 and shares_cnt == 1:
+            post_parent_class = previous_parent.get_attribute('class')
+            return '.' + '.'.join(post_parent_class.split(' '))
+    raise FacebookParseError('cant not find main post ancestor')
+
+
 def get_post_parent_selector(driver: 'WebDriver') -> str:
     """
-    Find posts parent container
+    Find posts parent container on community posts page
     """
     likes_blocks = driver.find_elements_by_xpath('//*[contains(text(), "Нравится")]')
     comments_blocks = driver.find_elements_by_xpath('//*[contains(text(), "Комментировать")]')

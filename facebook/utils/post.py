@@ -53,17 +53,19 @@ def get_post_img(post: 'WebElement') -> Optional[str]:
     """
     Parse post image link
     """
-    try:
-        fb_link = (
-            post
-            .find_elements_by_xpath(
-                './/div[@class="uiScaledImageContainer"]/img'
-            )[0].get_attribute('src')
-        )
-    except (IndexError, NoSuchElementException):
-        return None
-    else:
-        return fb_link
+    for idx in (0, 1):
+        try:
+            fb_link = (
+                post
+                .find_elements_by_xpath(
+                    './/div[@class="uiScaledImageContainer"]/img'
+                )[idx].get_attribute('src')
+            )
+        except (IndexError, NoSuchElementException):
+            pass
+        else:
+            return fb_link
+    return None
 
 
 def parse_count(text: str) -> int:

@@ -180,6 +180,7 @@ if __name__ == '__main__':
         pid_file_name='facebook_chrome.pid',
         pid_file_path=PID_PATH,
         logger=logger,
+        headless=(not DEBUG),
         **extra_params
     )
     try:
