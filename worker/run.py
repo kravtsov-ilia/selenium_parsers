@@ -31,7 +31,8 @@ QUEUE_IN = 'selenium_worker_posts_in'
 def parse_fb_post(driver: 'WebDriver', post_link: str) -> dict:
     club_id = post_link.split('/')[-1]
     post_el = driver.find_element_by_css_selector('#contentArea')
-    return cast_facebook_compare_data(post_link, parse_post(post_el, club_id), 'facebook.com')
+    post_data = parse_post(post_el, club_id)
+    return cast_facebook_compare_data(post_link, post_data, 'facebook.com')
 
 
 def parse_insta_post(driver: 'WebDriver', post_link: str) -> dict:
