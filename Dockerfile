@@ -13,7 +13,8 @@ RUN \
 ENV LANG=ru_RU.UTF-8 LANGUAGE=ru_RU.UTF-8 PYTHONPATH=/opt/
 
 RUN mkdir -p /opt/selenium_parsers/
-COPY . /opt/selenium_parsers/
+
+COPY requirements.txt /opt/selenium_parsers/requirements.txt
 WORKDIR /opt/selenium_parsers/
 
 RUN \
@@ -22,6 +23,8 @@ RUN \
  pip install --upgrade pip && \
  pip install -r requirements.txt --no-cache-dir && \
  apk --purge del .build-deps
+
+COPY . /opt/selenium_parsers/
 
 ADD crontab /etc/cron.d/parsers
 RUN chmod 0755 /etc/cron.d/parsers && touch /var/log/cron.log

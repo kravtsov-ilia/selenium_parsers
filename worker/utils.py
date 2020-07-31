@@ -59,3 +59,47 @@ def save_result(task_hash: str, link: str, data: dict) -> None:
             'result': data,
             'datetime': datetime.datetime.now()
         })
+
+
+def get_compare_data(
+        link: str,
+        likes: str,
+        dislikes: str,
+        comments: str,
+        reposts: str,
+        views: str,
+        domain: str
+) -> dict:
+    return {
+        'link': link,
+        'likes': likes,
+        'dislikes': dislikes,
+        'comments': comments,
+        'reposts': reposts,
+        'views': views,
+        'sn': domain
+    }
+
+
+def cast_facebook_compare_data(post_link, post_data, domain):
+    return get_compare_data(
+        link=post_link,
+        likes=post_data['likes'],
+        dislikes='-',
+        comments=post_data['comments'],
+        reposts=post_data['shares'],
+        views='-',
+        domain=domain,
+    )
+
+
+def cast_instagram_compare_data(post_link, post_data, domain):
+    return get_compare_data(
+        link=post_link,
+        likes=post_data['likes_count'],
+        dislikes='-',
+        comments=post_data['comment_count'],
+        reposts='-',
+        views=post_data.get('video_views', '-'),
+        domain=domain,
+    )
