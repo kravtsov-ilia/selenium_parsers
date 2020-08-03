@@ -12,11 +12,11 @@ import pymongo
 from selenium.common.exceptions import NoSuchElementException
 
 from selenium_parsers.facebook.facebook_logger import setup_fb_logger
-from selenium_parsers.facebook.utils.database import get_facebook_proxy, get_facebook_account
+from selenium_parsers.facebook.utils.database import get_facebook_proxy
 from selenium_parsers.facebook.utils.general import FacebookParseError
-from selenium_parsers.facebook.utils.login import login
 from selenium_parsers.facebook.utils.page import get_display_name, get_club_id, get_club_icon, \
-    get_members_and_page_like_count, get_post_parent_selector, scroll_while_loading, extract_posts
+    get_members_and_page_like_count, get_post_parent_selector, scroll_while_loading, extract_posts, \
+    close_unauthorized_popup
 from selenium_parsers.facebook.utils.post import get_post_short_text, generate_post_id, get_likes_count, \
     get_actions_count, get_post_img, get_post_date
 from selenium_parsers.utils.database import get_selenium_links
@@ -83,10 +83,6 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
 
     driver.get('https://facebook.com')
     sleep(2)
-    account_name, account_login, account_password, account_cookies = get_facebook_account()
-    set_cookies(driver, account_cookies)
-
-    login(driver, account_login, account_password, account_name)
 
     parsed_pages = 0
     for link in facebook_pages:
@@ -98,6 +94,8 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
         page_posts_link = f'{link}/posts/'
         driver.get(page_posts_link)
         sleep(2)
+
+        close_unauthorized_popup(driver)
         try:
             display_name = get_display_name(driver) or url_name
             club_id = get_club_id(driver) or url_name
@@ -106,7 +104,12 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
             members_cnt, page_likes_cnt = get_members_and_page_like_count(driver, driver.current_url)
 
             posts_selector = get_post_parent_selector(driver)
-            scroll_while_loading(driver, posts_selector)
+            scroll_while_loading(
+                driver,
+                posts_selector,
+                trigger=close_unauthorized_popup,
+                trigger_kwargs={'driver': driver}
+            )
             posts = extract_posts(driver, posts_selector)
 
             total_posts_counter: int = 0
@@ -162,7 +165,6 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
 
 if __name__ == '__main__':
     setup_signals_handlers(process_terminate)
-
     setup_fb_logger()
     facebook_links = get_selenium_links(
         column_name='page_link',

@@ -2,7 +2,7 @@ import logging
 from time import sleep
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, ElementNotInteractableException
 from selenium.webdriver.common.keys import Keys
 
 from selenium_parsers.facebook.utils.general import FacebookParseError
@@ -160,7 +160,12 @@ def get_post_parent_selector(driver: 'WebDriver') -> str:
     raise FacebookParseError('cant not find main post ancestor')
 
 
-def scroll_while_loading(driver: 'WebDriver', posts_css_selector: str) -> None:
+def scroll_while_loading(
+        driver: 'WebDriver',
+        posts_css_selector: str,
+        trigger: Optional[callable] = None,
+        trigger_kwargs: Optional[dict] = None
+) -> None:
     """
     Scroll page while posts are loading or max iteration was reached
     """
@@ -182,6 +187,8 @@ def scroll_while_loading(driver: 'WebDriver', posts_css_selector: str) -> None:
         sleep(2)
         prev_posts_count = current_posts_count
         current_posts_count = len(driver.find_elements_by_css_selector(posts_css_selector))
+        if trigger:
+            trigger(**trigger_kwargs)
 
 
 def extract_posts(driver: 'WebDriver', posts_selector: str) -> List['WebElement']:
@@ -213,7 +220,7 @@ def get_display_name(driver: 'WebDriver') -> Optional[str]:
         except NoSuchElementException:
             pass
         else:
-            return display_name
+            return ''.join([c for c in display_name if c.isalnum() or c == ' '])
 
     logger.error('can not parse group display name')
 
@@ -228,3 +235,20 @@ def get_club_id(driver: 'WebDriver') -> Optional[str]:
         logger.warning('no such club id')
         club_id = None
     return club_id
+
+
+def close_unauthorized_popup(driver: 'WebDriver') -> bool:
+    """
+    Close popup for unauthorized users,
+    return true if popup was closed
+    """
+    try:
+        (
+            driver
+            .find_element_by_xpath('//div/a[@href="#"][contains(text(), "Не сейчас")]')
+            .click()
+        )
+    except (ElementNotInteractableException, NoSuchElementException):
+        return False
+    else:
+        return True
