@@ -45,17 +45,15 @@ class MongoModel:
     _data = {}
 
     def __new__(cls, *args, **kwargs):
-        if cls._data:
-            return super().__new__(cls, *args, **kwargs)
-
         model_fields = []
+        cls._data = {}
         for attr in dir(cls):
             if isinstance(getattr(cls, attr), MongoField):
                 model_fields.append(attr)
 
         for field in model_fields:
             cls._data[field] = None
-        return super().__new__(cls, *args, **kwargs)
+        return super().__new__(cls)
 
     def __init__(self, init_data=None):
         self._data = self._data.copy()
@@ -76,6 +74,8 @@ class MongoModel:
             return object.__getattribute__(self, item)
 
     def __setattr__(self, key, value):
+        if key == '_data':
+            return object.__setattr__(self, key, value)
         if key not in self._data:
             raise AttributeError(f'{key} - attribute not found in model {self.__class__}')
         field_obj = getattr(self, f'_attr__{key}')
@@ -105,7 +105,7 @@ class BaseClubModel(MongoModel):
 
 class BasePostModel(MongoModel):
     club_id = MongoStrField(required=True)
-    clib_link = MongoStrField()
+    club_link = MongoStrField()
     content = MongoStrField()
 
     comments_count = MongoIntField()

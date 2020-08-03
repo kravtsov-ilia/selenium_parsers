@@ -16,7 +16,7 @@ from selenium_parsers.facebook.utils.database import get_facebook_proxy
 from selenium_parsers.facebook.utils.general import FacebookParseError
 from selenium_parsers.facebook.utils.page import get_display_name, get_club_id, get_club_icon, \
     get_members_and_page_like_count, get_post_parent_selector, scroll_while_loading, extract_posts, \
-    close_unauthorized_popup
+    close_unauthorized_popup, transform_link_to_russian
 from selenium_parsers.facebook.utils.post import get_post_short_text, generate_post_id, get_likes_count, \
     get_actions_count, get_post_img, get_post_date
 from selenium_parsers.utils.database import get_selenium_links
@@ -83,17 +83,18 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
     facebook_posts_data = database['facebook_posts_data']
 
     driver.get('https://facebook.com')
-    sleep(2)
-
     parsed_pages = 0
     for link in facebook_pages:
+        link = link.rstrip()
         logger.info(f'starting to parse {link}')
         url_name = link.split('/')[-1]
         source_link = link
         if link[-1] == '/':
             link = link[:-1]
         page_posts_link = f'{link}/posts/'
-        driver.get(page_posts_link)
+
+        ru_page_posts_link = transform_link_to_russian(page_posts_link)
+        driver.get(ru_page_posts_link)
         sleep(2)
 
         close_unauthorized_popup(driver)
@@ -126,9 +127,9 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
                 fb_post = FacebookPostData(post_data)
                 fb_post.save(collection=facebook_posts_data)
 
-                likes_count = post_data['likes']
-                comments_cnt = post_data['comments']
-                shares_cnt = post_data['shares']
+                likes_count = post_data['likes_count']
+                comments_cnt = post_data['comments_count']
+                shares_cnt = post_data['shares_count']
 
                 total_posts_counter += 1
                 total_likes_counter += likes_count
@@ -137,16 +138,16 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
 
             page_data = {
                 'club_id': club_id,
-                'page_link': source_link,
+                'club_link': source_link,
                 'posts_count': total_posts_counter,
-                'members_count': members_cnt,
-                'photo': club_icon,
-                'screen_name': display_name,
+                'subscribers_count': members_cnt,
+                'club_img': club_icon,
+                'club_display_name': display_name,
                 'datetime': datetime.datetime.now(),
                 'page_likes': page_likes_cnt,
                 'posts_likes': total_likes_counter,
-                'comments': total_comments_counter,
-                'shares': total_shares_counter,
+                'comments_count': total_comments_counter,
+                'shares_count': total_shares_counter,
             }
             facebook_data = FacebookPageData(page_data)
             facebook_data.save(facebook_pages_data)

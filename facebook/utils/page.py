@@ -252,3 +252,10 @@ def close_unauthorized_popup(driver: 'WebDriver') -> bool:
         return False
     else:
         return True
+
+
+def transform_link_to_russian(link: str) -> str:
+    if 'www' in link:
+        return link.replace('www', 'ru-ru')
+    else:
+        return link.replace('https://', 'https://ru-ru.')
