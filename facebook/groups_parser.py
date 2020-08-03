@@ -21,6 +21,7 @@ from selenium_parsers.facebook.utils.post import get_post_short_text, generate_p
     get_actions_count, get_post_img, get_post_date
 from selenium_parsers.utils.database import get_selenium_links
 from selenium_parsers.utils.general import create_chrome_driver
+from selenium_parsers.utils.mongo_models import FacebookPageData, FacebookPostData
 from selenium_parsers.utils.parsers_signals import setup_signals_handlers, \
     process_terminate
 
@@ -58,13 +59,13 @@ def parse_post(post: 'WebElement', club_id: str) -> Dict:
         post_data = {
             'club_id': club_id,
             'post_id': post_id,
-            'datetime': post_date,
             'post_img': image_link,
-            'short_text': post_short_text,
-            'comments': comments_cnt,
-            'shares': shares_cnt,
+            'content': post_short_text,
+            'comments_count': comments_cnt,
+            'shares_count': shares_cnt,
+            'likes_count': likes_count,
+            'datetime': post_date,
             'parse_datetime': datetime.datetime.now(),
-            'likes': likes_count,
         }
         return post_data
     except NoSuchElementException:
@@ -119,7 +120,8 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
                 except NoSuchElementException:
                     continue
 
-                facebook_posts_data.insert_one(post_data)
+                fb_post = FacebookPostData(post_data)
+                fb_post.save(collection=facebook_posts_data)
 
                 likes_count = post_data['likes']
                 comments_cnt = post_data['comments']
@@ -143,8 +145,8 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
                 'comments': total_comments_counter,
                 'shares': total_shares_counter,
             }
-            facebook_pages_data.insert_one(page_data)
-
+            facebook_data = FacebookPageData(page_data)
+            facebook_data.save(facebook_pages_data)
         except (FacebookParseError, NoSuchElementException):
             logger.error(f'cant parse facebook page {link}', exc_info=True)
             code = ''.join(random.choice(string.hexdigits) for _ in range(5))
