@@ -5,7 +5,7 @@ import os
 import random
 import string
 from time import sleep
-from typing import List, TYPE_CHECKING, Dict
+from typing import List, TYPE_CHECKING
 
 import environ
 import pymongo
@@ -45,7 +45,7 @@ logger.info(f'DEBUG {DEBUG}')
 logger.info(f'SCREENSHOTS_DIR {SCREENSHOTS_DIR}')
 
 
-def parse_post(post: 'WebElement', club_id: str) -> Dict:
+def parse_post(post: 'WebElement', club_id: str) -> FacebookPostData:
     post_short_text = get_post_short_text(post)
     try:
         post_id = generate_post_id(post_short_text)
@@ -67,7 +67,7 @@ def parse_post(post: 'WebElement', club_id: str) -> Dict:
             'datetime': post_date,
             'parse_datetime': datetime.datetime.now(),
         }
-        return post_data
+        return FacebookPostData(post_data)
     except NoSuchElementException:
         logger.error(f'can not parse post - {post_short_text}', exc_info=True)
         raise

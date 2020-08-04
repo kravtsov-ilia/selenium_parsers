@@ -8,6 +8,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 from selenium_parsers.utils.general import webdriver_singleton, get_tuned_driver
+from selenium_parsers.utils.mongo_models import FacebookPostData
 
 if TYPE_CHECKING:
     from selenium.webdriver.chrome.webdriver import WebDriver
@@ -81,13 +82,17 @@ def get_compare_data(
     }
 
 
-def cast_facebook_compare_data(post_link, post_data, domain):
+def cast_facebook_compare_data(
+        post_link: str,
+        fb_data_object: 'FacebookPostData',
+        domain: str
+):
     return get_compare_data(
         link=post_link,
-        likes=post_data['likes'],
+        likes=fb_data_object.likes_count,
         dislikes='-',
-        comments=post_data['comments'],
-        reposts=post_data['shares'],
+        comments=fb_data_object.comments_count,
+        reposts=fb_data_object.shares_count,
         views='-',
         domain=domain,
     )

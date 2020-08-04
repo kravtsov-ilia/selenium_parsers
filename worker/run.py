@@ -10,6 +10,7 @@ import pika
 from selenium.common.exceptions import NoSuchElementException
 
 from selenium_parsers.facebook.groups_parser import parse_post
+from selenium_parsers.utils.mongo_models import FacebookPostData
 from selenium_parsers.utils.selenium_loggers import setup_logger
 from selenium_parsers.worker.utils import (
     get_driver, save_result, create_vhost_if_not_exist, cast_facebook_compare_data, cast_instagram_compare_data
@@ -32,7 +33,8 @@ def parse_fb_post(driver: 'WebDriver', post_link: str) -> dict:
     club_id = post_link.split('/')[-1]
     post_el = driver.find_element_by_css_selector('#contentArea')
     post_data = parse_post(post_el, club_id)
-    return cast_facebook_compare_data(post_link, post_data, 'facebook.com')
+    fb_obj = FacebookPostData(post_data)
+    return cast_facebook_compare_data(post_link, fb_obj, 'facebook.com')
 
 
 def parse_insta_post(driver: 'WebDriver', post_link: str) -> dict:
