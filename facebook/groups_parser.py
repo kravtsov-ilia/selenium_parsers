@@ -120,16 +120,15 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
             total_shares_counter: int = 0
             for i, post in enumerate(posts, start=1):
                 try:
-                    post_data = parse_post(post, club_id)
+                    fb_post_obj = parse_post(post, club_id)
                 except NoSuchElementException:
                     continue
 
-                fb_post = FacebookPostData(post_data)
-                fb_post.save(collection=facebook_posts_data)
+                fb_post_obj.save(collection=facebook_posts_data)
 
-                likes_count = post_data['likes_count']
-                comments_cnt = post_data['comments_count']
-                shares_cnt = post_data['shares_count']
+                likes_count = fb_post_obj.likes_count
+                comments_cnt = fb_post_obj.comments_count
+                shares_cnt = fb_post_obj.shares_count
 
                 total_posts_counter += 1
                 total_likes_counter += likes_count

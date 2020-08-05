@@ -46,7 +46,8 @@ def get_post_date(post: 'WebElement') -> 'datetime.datetime':
     post_date_str = post.find_element_by_xpath('.//a/abbr[@data-utime]').get_attribute('title')
     import locale
     locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
-    return dateparser.parse(post_date_str, date_formats=['%A, %d %B %Y г. в %H:%M'], languages=['ru'])
+    date = dateparser.parse(post_date_str, date_formats=['%A, %d %B %Y г. в %H:%M'], languages=['ru'])
+    return date
 
 
 def get_post_img(post: 'WebElement') -> Optional[str]:

@@ -10,7 +10,7 @@ import pika
 from selenium.common.exceptions import NoSuchElementException
 
 from selenium_parsers.facebook.groups_parser import parse_post
-from selenium_parsers.utils.mongo_models import FacebookPostData
+from selenium_parsers.facebook.utils.page import transform_link_to_russian
 from selenium_parsers.utils.selenium_loggers import setup_logger
 from selenium_parsers.worker.utils import (
     get_driver, save_result, create_vhost_if_not_exist, cast_facebook_compare_data, cast_instagram_compare_data
@@ -32,8 +32,7 @@ QUEUE_IN = 'selenium_worker_posts_in'
 def parse_fb_post(driver: 'WebDriver', post_link: str) -> dict:
     club_id = post_link.split('/')[-1]
     post_el = driver.find_element_by_css_selector('#contentArea')
-    post_data = parse_post(post_el, club_id)
-    fb_obj = FacebookPostData(post_data)
+    fb_obj = parse_post(post_el, club_id)
     return cast_facebook_compare_data(post_link, fb_obj, 'facebook.com')
 
 
@@ -54,21 +53,33 @@ def parse_insta_post(driver: 'WebDriver', post_link: str) -> dict:
     return cast_instagram_compare_data(post_link, result, 'instagram.com')
 
 
+def handle_link(link: str) -> str:
+    if 'facebook' in link:
+        return transform_link_to_russian(link)
+    return link
+
+
+def get_second_level_domain(link: str) -> str:
+    parsed_uri = urlparse(link)
+    domain = parsed_uri.hostname
+    return '.'.join(domain.split('.')[-2:])
+
+
 def callback(ch, method, properties, body):
     body_json = json.loads(body)
     post_link = body_json['post_link']
     task_hash = body_json['task_hash']
     driver = get_driver('selenium worker', pid_path=PID_PATH)
+
+    post_link = handle_link(post_link)
     driver.get(post_link)
     sleep(2)
+
     services_map = {
-        'www.facebook.com': parse_fb_post,
         'facebook.com': parse_fb_post,
-        'www.instagram.com': parse_insta_post,
         'instagram.com': parse_insta_post,
     }
-    parsed_uri = urlparse(post_link)
-    domain = parsed_uri.hostname
+    domain = get_second_level_domain(post_link)
     if domain in services_map:
         post_data = services_map[domain](driver, post_link)
         save_result(task_hash, post_link, post_data)
