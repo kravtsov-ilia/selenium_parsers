@@ -4,7 +4,6 @@ import os
 import random
 import string
 from time import sleep
-from typing import Optional
 
 import environ
 import pymongo
@@ -21,8 +20,8 @@ logger = logging.getLogger('tiktok_parser')
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     USE_PROXY=(bool, False),
-    TIKTOK_PROXY_IP=(Optional[str], None),
-    TIKTOK_PROXY_PORT=(Optional[str], None)
+    TIKTOK_PROXY_IP=(str, None),
+    TIKTOK_PROXY_PORT=(str, None)
 )
 DEBUG = env('DJANGO_DEBUG')
 USE_PROXY = env('USE_PROXY')
@@ -136,7 +135,7 @@ class TikTokParser:
                 raise TikTokParsingError('Unknown absolute date format')
             return datetime.datetime(day=day, month=month, year=year)
         else:
-            raise TikTokParsingError('Unknown date format')
+            raise TikTokParsingError(f'Unknown date format: {date_text}')
 
     def _get_post_date(self):
         date_block_text = self._driver.find_elements_by_css_selector('h2.user-nickname')[0].text
