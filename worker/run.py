@@ -108,6 +108,7 @@ def main():
         )
 
         channel.start_consuming()
+        logger.info('Worker is online')
         while True:
             pass
 

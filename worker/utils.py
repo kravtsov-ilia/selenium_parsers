@@ -22,8 +22,10 @@ VHOST_NAME = 'selenium_worker_posts'
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     USE_PROXY=(bool, True),
+    HEADLESS_SELENIUM_PARSERS=(bool, True)
 )
 DEBUG = env('DJANGO_DEBUG')
+HEADLESS_SELENIUM_PARSERS = env('HEADLESS_SELENIUM_PARSERS')
 USE_PROXY = env('USE_PROXY')
 PROXY_IP = env('SELENIUM_WORKER_PROXY_IP')
 PROXY_PORT = env('SELENIUM_WORKER_PROXY_PORT')
@@ -38,7 +40,7 @@ def get_driver(server_name: str, pid_path: str) -> 'WebDriver':
     return get_tuned_driver(
         parser_name=server_name,
         logger=logger,
-        headless=(not DEBUG),
+        headless=HEADLESS_SELENIUM_PARSERS,
         **extra_params
     )
 
