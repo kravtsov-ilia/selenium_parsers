@@ -7,7 +7,6 @@ import string
 from time import sleep
 from typing import List, TYPE_CHECKING
 
-import environ
 import pymongo
 from selenium.common.exceptions import NoSuchElementException
 
@@ -19,6 +18,7 @@ from selenium_parsers.facebook.utils.page import get_display_name, get_club_id, 
     close_unauthorized_popup, transform_link_to_russian
 from selenium_parsers.facebook.utils.post import get_post_short_text, generate_post_id, get_likes_count, \
     get_actions_count, get_post_img, get_post_date
+from selenium_parsers.utils.constants import FACEBOOK_SCREENSHOTS_DIR, DEBUG, USE_PROXY, FACEBOOK_PID_PATH
 from selenium_parsers.utils.database import get_selenium_links
 from selenium_parsers.utils.general import create_chrome_driver
 from selenium_parsers.utils.mongo_models import FacebookPageData, FacebookPostData
@@ -30,19 +30,11 @@ if TYPE_CHECKING:
     from selenium.webdriver.chrome.webdriver import WebDriver
     from selenium.webdriver.remote.webelement import WebElement
 
-env = environ.Env(
-    DJANGO_DEBUG=(bool, False),
-    USE_PROXY=(bool, True)
-)
-DEBUG = env('DJANGO_DEBUG')
-USE_PROXY = env('USE_PROXY')
-SCREENSHOTS_DIR = env('SCREENSHOTS_DIR')
-PID_PATH = env('PID_PATH')
 
 logger = logging.getLogger('facebook_parser')
 logger.info(f'USE_PROXY {USE_PROXY}')
 logger.info(f'DEBUG {DEBUG}')
-logger.info(f'SCREENSHOTS_DIR {SCREENSHOTS_DIR}')
+logger.info(f'SCREENSHOTS_DIR {FACEBOOK_SCREENSHOTS_DIR}')
 
 
 def parse_post(post: 'WebElement', club_id: str) -> FacebookPostData:
@@ -154,7 +146,7 @@ def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -
             logger.error(f'cant parse facebook page {link}', exc_info=True)
             code = ''.join(random.choice(string.hexdigits) for _ in range(5))
             logger.error(f'incident code: {code}', exc_info=True)
-            screen_path = os.path.join(SCREENSHOTS_DIR, f'facebook_screenshot_{code}.png')
+            screen_path = os.path.join(FACEBOOK_SCREENSHOTS_DIR, f'facebook_screenshot_{code}.png')
             chrom_driver.save_screenshot(screen_path)
         else:
             parsed_pages += 1
@@ -181,8 +173,7 @@ if __name__ == '__main__':
         }
 
     chrom_driver = create_chrome_driver(
-        pid_file_name='facebook_chrome.pid',
-        pid_file_path=PID_PATH,
+        pid_file_path=FACEBOOK_PID_PATH,
         logger=logger,
         headless=(not DEBUG),
         **extra_params

@@ -42,20 +42,18 @@ def webdriver_singleton(func):
 
 def create_chrome_driver(
     pid_file_path: str,
-    pid_file_name: str,
     logger: 'Logger',
     headless: bool = True,
     **extra_params
 ) -> 'WebDriver':
-    pid_file = os.path.join(pid_file_path, f'{pid_file_name}')
-    terminate_old_process(pid_file)
+    terminate_old_process(pid_file_path)
     driver = get_tuned_driver(
         parser_name='facebook parser',
         logger=logger,
         headless=headless,
         **extra_params
     )
-    save_driver_pid(driver, pid_file)
+    save_driver_pid(driver, pid_file_path)
     return driver
 
 

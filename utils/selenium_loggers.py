@@ -1,13 +1,8 @@
 import logging.config
 import os
 
-import environ
+from selenium_parsers.utils.constants import DEBUG
 
-ENV = environ.Env(
-    DJANGO_DEBUG=(bool, False)
-)
-
-DEBUG = ENV('DJANGO_DEBUG')
 MAX_LOG_SIZE = 1024 * 1024 * 50
 
 

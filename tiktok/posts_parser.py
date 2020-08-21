@@ -1,67 +1,66 @@
 import datetime
 import logging
-import os
-import random
-import string
 from time import sleep
 
-import environ
 import pymongo
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.keys import Keys
 
 from selenium_parsers.facebook.utils.page import scroll_while_loading
 from selenium_parsers.tiktok.tiktok_logger import setup_tiktok_logger
+from selenium_parsers.utils.constants import TIKTOK_PROXY_IP, TIKTOK_PROXY_PORT, TIKTOK_SCREENSHOTS_DIR, DEBUG
 from selenium_parsers.utils.database import get_selenium_links
-from selenium_parsers.utils.general import get_tuned_driver
 from selenium_parsers.utils.parsers_signals import setup_signals_handlers, process_terminate
+from selenium_parsers.utils.parsing import BaseParser
 
 logger = logging.getLogger('tiktok_parser')
-
-env = environ.Env(
-    DJANGO_DEBUG=(bool, False),
-    USE_PROXY=(bool, False),
-    TIKTOK_PROXY_IP=(str, None),
-    TIKTOK_PROXY_PORT=(str, None)
-)
-DEBUG = env('DJANGO_DEBUG')
-USE_PROXY = env('USE_PROXY')
-PID_PATH = env('PID_PATH')
-PROXY_IP = env('TIKTOK_PROXY_IP')
-PROXY_PORT = env('TIKTOK_PROXY_PORT')
-SCREENSHOTS_DIR = env('TIKTOK_SCREENSHOTS_DIR')
 
 
 class TikTokParsingError(Exception):
     pass
 
 
-class TikTokParser:
+class TikTokParser(BaseParser):
     def __init__(self):
         logger.info('tiktok parser initialization start')
-        self._setup_driver()
         self._post_item_css_selector = '.video-feed-item'
+        super().__init__()
 
-    def _get_proxy(self):
-        return PROXY_IP, PROXY_PORT
+    @property
+    def parser_name(self):
+        return 'tiktok parser'
 
-    def _setup_driver(self):
-        extra_params = {}
-        if USE_PROXY:
-            proxy_ip, proxy_port = self._get_proxy()
-            extra_params.update(proxy_ip=proxy_ip, proxy_port=proxy_port)
+    @property
+    def _proxy_ip(self):
+        return TIKTOK_PROXY_IP
 
-        self._driver = get_tuned_driver(
-            parser_name='tiktok parser',
-            logger=logger,
-            headless=(not DEBUG),
-            **extra_params
-        )
+    @property
+    def _proxy_port(self):
+        return TIKTOK_PROXY_PORT
+
+    @property
+    def _logger(self):
+        return logger
+
+    @property
+    def screenshot_dir(self):
+        return TIKTOK_SCREENSHOTS_DIR
 
     def _scroll_to_bottom(self):
         scroll_while_loading(
             self._driver,
             self._post_item_css_selector
         )
+
+    def _scroll_to_top(self):
+        offset = self._driver.execute_script('return window.pageYOffset;')
+        while offset > 100:
+            html = self._driver.find_element_by_tag_name('html')
+            for _ in range(4):
+                html.send_keys(Keys.HOME)
+                sleep(0.3)
+            sleep(1)
+            offset = self._driver.execute_script('return window.pageYOffset;')
 
     def _posts(self, link):
         if DEBUG:
@@ -70,6 +69,7 @@ class TikTokParser:
         self._driver.get(link)
         sleep(2)
         self._scroll_to_bottom()
+        self._scroll_to_top()
         posts = self._driver.find_elements_by_css_selector(self._post_item_css_selector)
         for post in posts:
             post.click()
@@ -88,8 +88,6 @@ class TikTokParser:
         '14 ч назад'
         '1 дн. назад'
         '1 нед. назад'
-        '7-8'
-        '7-7'
         '6-27'
         '2019-12-29'
         """
@@ -192,12 +190,6 @@ class TikTokParser:
                     'parse_datetime': datetime.datetime.now(),
                 }
                 tiktok_posts_data.insert_one(post_data)
-
-    def take_screenshot(self) -> str:
-        code = ''.join(random.choice(string.hexdigits) for _ in range(5))
-        screen_path = os.path.join(SCREENSHOTS_DIR, f'tiktok_screenshot_{code}.png')
-        self._driver.save_screenshot(screen_path)
-        return screen_path
 
 
 if __name__ == '__main__':

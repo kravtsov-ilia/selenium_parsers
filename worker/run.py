@@ -5,12 +5,12 @@ from time import sleep
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-import environ
 import pika
 from selenium.common.exceptions import NoSuchElementException
 
 from selenium_parsers.facebook.groups_parser import parse_post
 from selenium_parsers.facebook.utils.page import transform_link_to_russian
+from selenium_parsers.utils.constants import SELENIUM_WORKER_PID_PATH, RABBIT_HOST
 from selenium_parsers.utils.selenium_loggers import setup_logger
 from selenium_parsers.worker.utils import (
     get_driver, save_result, create_vhost_if_not_exist, cast_facebook_compare_data, cast_instagram_compare_data
@@ -20,10 +20,6 @@ if TYPE_CHECKING:
     from selenium.webdriver.chrome.webdriver import WebDriver
 
 logger = logging.getLogger('selenium_worker')
-
-env = environ.Env()
-PID_PATH = env('SELENIUM_WORKER_PID_PATH')
-RABBIT_HOST = env('RABBIT_HOST')
 
 VHOST_NAME = 'selenium_worker_posts'
 QUEUE_IN = 'selenium_worker_posts_in'
@@ -69,7 +65,7 @@ def callback(ch, method, properties, body):
     body_json = json.loads(body)
     post_link = body_json['post_link']
     task_hash = body_json['task_hash']
-    driver = get_driver('selenium worker', pid_path=PID_PATH)
+    driver = get_driver('selenium worker', pid_path=SELENIUM_WORKER_PID_PATH)
 
     post_link = handle_link(post_link)
     driver.get(post_link)
