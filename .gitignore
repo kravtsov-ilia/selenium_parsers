@@ -1,0 +1,17 @@
+owl_venv/
+api/celerybeat-schedule/
+.coverage
+.idea/
+.vscode/
+.DS_Store
+env/
+docker-compose.local.yml
+htmlcov
+scripts/
+/.env*
+.python-version
+.pytest_cache
+!**/__pycache__/
+*.py[cod]
+anon.session
+anon.session-journal
