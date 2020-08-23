@@ -13,21 +13,36 @@ class BaseParser:
 
     @property
     def parser_name(self):
+        """
+        Set selenium parser name for logging
+        """
         raise NotImplementedError()
 
     @property
     def _proxy_ip(self):
+        """
+        Set selenium parser proxy ip
+        """
         raise NotImplementedError()
 
     @property
     def _proxy_port(self):
+        """
+        Set selenium parser proxy port
+        """
         raise NotImplementedError()
 
     @property
     def _logger(self):
+        """
+        Set selenium parser logger
+        """
         raise NotImplementedError()
 
     def _setup_driver(self):
+        """
+        Prepare selenium driver
+        """
         extra_params = {}
         if USE_PROXY:
             extra_params.update(proxy_ip=self._proxy_ip, proxy_port=self._proxy_port)
@@ -41,6 +56,9 @@ class BaseParser:
 
     @property
     def screenshot_dir(self):
+        """
+        Set selenium screenshot dir for debugging
+        """
         raise NotImplementedError()
 
     def free(self):

@@ -5,6 +5,9 @@ from selenium_parsers.utils.database import update_records, get_postgres_connect
 
 
 def update_account_status(fb_login: str, status: AccessStatus) -> None:
+    """
+    Update account status, check is user can login
+    """
     update_records(
         table='api_facebookaccounts',
         set_dict={'last_login_status': status},

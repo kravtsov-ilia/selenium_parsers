@@ -38,6 +38,9 @@ logger.info(f'SCREENSHOTS_DIR {FACEBOOK_SCREENSHOTS_DIR}')
 
 
 def parse_post(post: 'WebElement', club_id: str) -> FacebookPostData:
+    """
+    Parse facebook post data
+    """
     post_short_text = get_post_short_text(post)
     try:
         post_id = generate_post_id(post_short_text)
@@ -66,11 +69,17 @@ def parse_post(post: 'WebElement', club_id: str) -> FacebookPostData:
 
 
 def set_cookies(driver: 'WebDriver', cookies: List[dict]) -> None:
+    """
+    Set cookies to browser driver
+    """
     for cookie in cookies:
         driver.add_cookie(cookie)
 
 
 def main(driver: 'WebDriver', facebook_pages: List[str], database: 'Database') -> None:
+    """
+    Parse all facebook groups from database, save result to mongodb
+    """
     facebook_pages_data = database['facebook_pages_data']
     facebook_posts_data = database['facebook_posts_data']
 

@@ -1,6 +1,7 @@
 import datetime
 import logging
 from time import sleep
+from typing import Generator
 
 import pymongo
 from selenium.common.exceptions import NoSuchElementException
@@ -21,21 +22,22 @@ class TikTokParsingError(Exception):
 
 
 class TikTokParser(BaseParser):
+    _post_item_css_selector = '.video-feed-item'
+
     def __init__(self):
         logger.info('tiktok parser initialization start')
-        self._post_item_css_selector = '.video-feed-item'
         super().__init__()
 
     @property
-    def parser_name(self):
+    def parser_name(self) -> str:
         return 'tiktok parser'
 
     @property
-    def _proxy_ip(self):
+    def _proxy_ip(self) -> str:
         return TIKTOK_PROXY_IP
 
     @property
-    def _proxy_port(self):
+    def _proxy_port(self) -> str:
         return TIKTOK_PROXY_PORT
 
     @property
@@ -43,16 +45,22 @@ class TikTokParser(BaseParser):
         return logger
 
     @property
-    def screenshot_dir(self):
+    def screenshot_dir(self) -> str:
         return TIKTOK_SCREENSHOTS_DIR
 
-    def _scroll_to_bottom(self):
+    def _scroll_to_bottom(self) -> None:
+        """
+        Scroll page to bottom to get all account records
+        """
         scroll_while_loading(
             self._driver,
             self._post_item_css_selector
         )
 
-    def _scroll_to_top(self):
+    def _scroll_to_top(self) -> None:
+        """
+        Scroll page to top
+        """
         offset = self._driver.execute_script('return window.pageYOffset;')
         while offset > 100:
             html = self._driver.find_element_by_tag_name('html')
@@ -62,7 +70,11 @@ class TikTokParser(BaseParser):
             sleep(1)
             offset = self._driver.execute_script('return window.pageYOffset;')
 
-    def _posts(self, link):
+    def _posts(self, link: str) -> Generator[None, None, None]:
+        """
+        Return tiktok post generator,
+        iterate through posts by clicking to post
+        """
         if DEBUG:
             self._driver.get('https://bot.sannysoft.com/')
             sleep(2)
@@ -78,10 +90,13 @@ class TikTokParser(BaseParser):
             self._driver.find_element_by_css_selector('img.control-icon.close').click()
             sleep(1)
 
-    def _get_post_content(self):
+    def _get_post_content(self) -> str:
+        """
+        Extract tiktok post raw text
+        """
         return self._driver.find_element_by_css_selector('h1.video-meta-title').text
 
-    def _parse_date(self, date_text):
+    def _parse_date(self, date_text: str) -> datetime.datetime:
         """
         Дата может встречаться в следующих форматах:
         '9 мин назад'
@@ -135,12 +150,18 @@ class TikTokParser(BaseParser):
         else:
             raise TikTokParsingError(f'Unknown date format: {date_text}')
 
-    def _get_post_date(self):
+    def _get_post_date(self) -> datetime.datetime:
+        """
+        Get datetime
+        """
         date_block_text = self._driver.find_elements_by_css_selector('h2.user-nickname')[0].text
         date_text = date_block_text.split('·')[1].strip()
         return self._parse_date(date_text)
 
-    def _get_counters(self, css_selector):
+    def _get_counters(self, css_selector: str) -> int:
+        """
+        Return number inside the container
+        """
         value_text = self._driver.find_element_by_css_selector(css_selector).text
         value_base = float(''.join(c for c in value_text if c.isdigit() or c == '.'))
         multiplier_slug = value_text[-1]
@@ -154,20 +175,29 @@ class TikTokParser(BaseParser):
             multiplier = 1
         return int(value_base * multiplier)
 
-    def _get_likes_count(self):
+    def _get_likes_count(self) -> int:
+        """
+        Get likes count from tiktok post
+        """
         return self._get_counters('strong.like-text')
 
-    def _get_comments_count(self):
+    def _get_comments_count(self) -> int:
+        """
+        Get comments from tiktok post
+        """
         return self._get_counters('strong.comment-text')
 
-    def _get_post_pic(self):
+    def _get_post_pic(self) -> str:
+        """
+        Return link to post picture
+        """
         style = self._driver.find_element_by_css_selector('div.video-card-browse').get_attribute('style')
         return style.split('"')[1]
 
     def free(self):
         self._driver.close()
 
-    def parse_page(self, chan_link):
+    def parse_page(self, chan_link: str) -> None:
         logger.info(f'starting to parse {chan_link}')
         with pymongo.MongoClient('mongodb://mongo', 27017) as mongo_client:
             mongo_db = mongo_client['owl_project']
